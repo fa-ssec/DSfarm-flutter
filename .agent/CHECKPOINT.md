@@ -1,132 +1,133 @@
 # 🛡️ DSFarm Flutter - Context Checkpoint
 
-> **Generated:** 2025-12-20 02:50 JST  
-> **Session:** Initial Architecture & Planning
+> **Generated:** 2025-12-20 03:08 JST  
+> **Session:** Week 1 Implementation Complete
 
 ---
 
 ## A. DIAGNOSTIK STATUS (SNAPSHOT)
 
 ### 1. Fase Aktif
-`Week 01: Foundation & Auth` - 🟡 In Progress
+`Week 01: Foundation & Auth` - 🟢 **~95% Complete**
 
-### 2. File Penting
+### 2. File Structure
 ```
-.agent/
-├── agents.md           # AI collaboration SOP
-├── ARCHITECTURE.md     # Technical design (multi-animal)
-├── ROADMAP.md          # 12-week timeline
-└── devlogs/
-    └── Week-01-Foundation.md  # Current week checklist
+lib/
+├── main.dart                    # ✅ App entry point
+├── app_router.dart              # ✅ GoRouter with auth guards
+├── core/
+│   ├── services/
+│   │   └── supabase_service.dart # ✅ Auth methods
+│   └── theme/
+│       └── app_theme.dart       # ✅ Light/Dark theme
+├── providers/
+│   └── auth_provider.dart       # ✅ Riverpod state
+└── features/
+    ├── auth/screens/
+    │   ├── login_screen.dart    # ✅ Form + validation
+    │   └── register_screen.dart # ✅ Form + password confirm
+    ├── farm_selector/screens/
+    │   └── farm_list_screen.dart # ✅ Placeholder
+    └── dashboard/screens/
+        └── dashboard_screen.dart # ✅ Placeholder
 ```
 
 ### 3. GitHub Repository
 - URL: https://github.com/fashrifsetiandi/DSfarm-flutter.git
 - Branch: `main`
-- Commits: 2
+- Latest Commit: `feat(week1): implement auth foundation`
 
 ---
 
-## B. KEPUTUSAN ARSITEKTUR YANG SUDAH DIBUAT
-
-### 1. Product Vision
-- **Nama:** DSFarm - Multi-Animal Farm Management
-- **Target:** Commercial (Freemium model)
-- **One account = Multiple farms** (bisa kelinci + kambing + ikan)
-
-### 2. Animal Priority
-1. 🐰 **Kelinci** (usaha sendiri sekarang) - Week 3-5
-2. 🐐 **Kambing/Domba** (rencana kedepan) - Week 6-8
-3. 🐟 **Ikan Gabus/Chana** (investasi breeding) - Week 9-11
-4. 🐔 **Unggas** (future) - Post-launch
-
-### 3. Development Strategy
-- **Hybrid approach**: Sequential per-animal, tapi foundation multi-animal dari awal
-- Config-driven architecture (AnimalConfig class)
-- Generic models (Livestock, Offspring, Housing) yang bisa dipakai semua hewan
-
-### 4. Tech Stack
-- Flutter + Dart
-- Supabase (Auth + Database)
-- Riverpod (State Management)
-- GoRouter (Navigation)
-
-### 5. Subscription Tiers (Planned)
-| Tier | Farms | Livestock | Price |
-|------|-------|-----------|-------|
-| Free | 1 | 50 max | Rp 0 |
-| Pro | 3 | Unlimited | Rp 50K/bln |
-| Enterprise | ∞ | + Team | Rp 200K/bln |
-
----
-
-## C. PROGRESS WEEK 1
+## B. PROGRESS WEEK 1
 
 ### ✅ Sudah Selesai
-- [x] Flutter project created
-- [x] agents.md added (AI collaboration SOP)
-- [x] ARCHITECTURE.md created (database schema, folder structure)
-- [x] ROADMAP.md created (12-week plan)
+- [x] Flutter project setup
+- [x] All documentation (agents.md, ARCHITECTURE.md, ROADMAP.md)
+- [x] Learning folder (belajar/) with 3 concepts
 - [x] GitHub repo connected & pushed
+- [x] 12 dependencies added (supabase, riverpod, go_router, etc)
+- [x] 30+ folder structure created
+- [x] SupabaseService with auth methods
+- [x] AuthProvider (Riverpod StateNotifier)
+- [x] LoginScreen with validation
+- [x] RegisterScreen with password confirmation
+- [x] GoRouter with auth guards
+- [x] Material 3 theme (light/dark)
 
-### 🚧 Belum Dikerjakan
-- [ ] Add dependencies (supabase_flutter, riverpod, go_router)
-- [ ] Create folder structure (core/, models/, features/)
-- [ ] Setup Supabase client
-- [ ] Login/Register screens
-- [ ] Auth state management
-
----
-
-## D. INSTRUKSI UNTUK SESSION BERIKUTNYA
-
-### Langkah Lanjutan (Next Actions)
-
-1. **Baca context ini dulu** untuk refresh memory
-
-2. **Update pubspec.yaml** dengan dependencies:
-   ```yaml
-   dependencies:
-     supabase_flutter: ^2.0.0
-     flutter_riverpod: ^2.4.0
-     go_router: ^13.0.0
-   ```
-
-3. **Buat folder structure:**
-   ```
-   lib/
-   ├── core/
-   ├── models/
-   ├── repositories/
-   ├── providers/
-   ├── features/
-   └── animal_modules/
-   ```
-
-4. **Setup Supabase client** di `lib/core/services/supabase_service.dart`
-
-5. **Refer ke ARCHITECTURE.md** untuk database schema dan detailed structure
+### ⏳ Pending
+- [ ] **Configure Supabase credentials** in `supabase_service.dart`
+- [ ] Test full auth flow on device/emulator
 
 ---
 
-## E. FILES TO READ ON RESUME
+## C. TECHNICAL DECISIONS MADE
+
+| Decision | Choice | Reason |
+|----------|--------|--------|
+| State Management | Riverpod | Modern, compile-safe |
+| Routing | GoRouter | Auth guards, deep linking |
+| Backend | Supabase | Same as PWA |
+| Architecture | Multi-farm | Supports kelinci, kambing, ikan, unggas |
+| Business Model | Freemium | Commercial app |
+
+---
+
+## D. DEPENDENCIES INSTALLED
+
+```yaml
+# Core
+supabase_flutter: ^2.8.3
+flutter_riverpod: ^2.6.1
+go_router: ^14.6.2
+
+# Utilities
+intl: ^0.20.1
+shared_preferences: ^2.3.4
+reactive_forms: ^17.0.1
+
+# UI
+flutter_svg: ^2.0.16
+cached_network_image: ^3.4.1
+shimmer: ^3.0.0
+fl_chart: ^0.70.2
+```
+
+---
+
+## E. NEXT STEPS (Week 2)
+
+1. **Configure Supabase credentials**
+2. **Test auth flow**
+3. **Create Farm model & repository**
+4. **Build Farm selector screen**
+5. **Switch farm functionality**
+6. **AnimalConfig base class**
+7. **RabbitConfig implementation**
+
+---
+
+## F. FILES TO READ ON RESUME
 
 | Priority | File | Purpose |
 |----------|------|---------|
-| 🥇 | `.agent/CHECKPOINT.md` | This file - current state |
-| 🥈 | `.agent/ARCHITECTURE.md` | Technical design |
-| 🥉 | `.agent/ROADMAP.md` | Timeline & milestones |
-| 4 | `.agent/devlogs/Week-01-Foundation.md` | Current week tasks |
-| 5 | `.agent/agents.md` | AI collaboration rules |
+| 🥇 | `.agent/CHECKPOINT.md` | This file |
+| 🥈 | `.agent/ARCHITECTURE.md` | Database schema, folder structure |
+| 🥉 | `.agent/ROADMAP.md` | 12-week timeline |
+| 4 | `lib/core/services/supabase_service.dart` | **Needs credentials** |
+| 5 | `.agent/devlogs/Week-01-Foundation.md` | Week 1 checklist |
 
 ---
 
-## F. CATATAN PENTING
+## G. COMMAND TO RESUME
 
-- Supabase URL & Key: **Sama dengan PWA RubyFarm yang sudah ada**
-- Database tables: Perlu **migrasi** untuk support multi-farm (add `farms` table, update foreign keys)
-- Existing data: Kelinci PWA data bisa di-migrate nanti
+```bash
+# To continue development:
+cd /Users/fashrif/code/DSfarm-learnflutter
+flutter pub get
+flutter run
+```
 
 ---
 
-**🔖 Untuk melanjutkan session baru, copy isi file ini dan paste sebagai context!**
+**🔖 Copy isi file ini untuk melanjutkan di session baru!**
