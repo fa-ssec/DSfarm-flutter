@@ -35,6 +35,41 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # ═══════════════════════════════════════════════════════════
+  # CORE DEPENDENCIES
+  # ═══════════════════════════════════════════════════════════
+  
+  # Backend & Auth
+  supabase_flutter: ^2.8.3
+  
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+  
+  # Navigation
+  go_router: ^14.6.2
+  
+  # ═══════════════════════════════════════════════════════════
+  # UTILITIES
+  # ═══════════════════════════════════════════════════════════
+  
+  # Date & Time
+  intl: ^0.20.1
+  
+  # Local Storage
+  shared_preferences: ^2.3.4
+  
+  # UI Helpers
+  flutter_svg: ^2.0.16
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  
+  # Forms & Validation
+  reactive_forms: ^17.0.1
+  
+  # Charts (for dashboard)
+  fl_chart: ^0.70.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
