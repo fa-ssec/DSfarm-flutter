@@ -150,9 +150,35 @@ lib/
 
 ## 9. 🚦 Current Status
 
-**Active Phase:** Week 1 - Foundation & Auth  
-**Active Devlog:** `.agent/devlogs/Week-01-Foundation.md`
+**Active Phase:** Week 6+ - Block Kandang System  
+**Active Devlog:** `.agent/DEVLOG.md`
 
 ---
 
-**Type `/next` to start Week 1!**
+## 10. 📝 Learning Material Format
+
+Saat membuat materi belajar baru di `.agent/belajar/`, gunakan format dari `standard-template.md`:
+
+### Struktur Wajib:
+1. **Header** - Phase/Week, Status, Date
+2. **Bridge Notes** - Konsep yang dipelajari (Teori + Praktek + Keywords)
+3. **Task Checklist** - Dengan traffic light status
+4. **Bugs & Fixes** - Dokumentasi error (dalam `<details>` tag)
+5. **Visual Changelog** - Screenshots before/after
+6. **Verification** - Definition of Done checklist
+
+### Naming Convention:
+```
+XX-nama-topik.md
+Contoh: 06-block-position-system.md
+```
+
+### Akses Command:
+```
+/learn [topic]  → Generate materi dengan template
+/devlog         → Update DEVLOG.md
+```
+
+---
+
+**Type `/next` to continue!**

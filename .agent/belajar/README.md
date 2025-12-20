@@ -12,8 +12,8 @@
 | 1 | Scalability | `01-scalability.md` | ✅ |
 | 2 | Multi-tenancy | `02-multi-tenancy.md` | ✅ |
 | 3 | Config-Driven Architecture | `03-config-driven.md` | ✅ |
-| 4 | Repository Pattern | `04-repository-pattern.md` | 🔜 Coming |
-| 5 | State Management | `05-state-management.md` | 🔜 Coming |
+| 5 | Auto-Generate Code Pattern | `05-auto-generate-code.md` | ✅ |
+| 6 | Block & Position System | `06-block-position-system.md` | ✅ |
 
 ---
 
