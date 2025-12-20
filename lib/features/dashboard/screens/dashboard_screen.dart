@@ -15,6 +15,8 @@ import '../../../providers/livestock_provider.dart';
 import '../../../models/livestock.dart';
 import '../../housing/screens/housing_list_screen.dart';
 import '../../livestock/screens/livestock_list_screen.dart';
+import '../../offspring/screens/offspring_list_screen.dart';
+import '../../breeding/screens/breeding_list_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
   final String farmId;
@@ -219,23 +221,19 @@ class DashboardScreen extends ConsumerWidget {
         icon: Icons.child_care,
         label: 'Anakan',
         color: Colors.orange,
-        onTap: () {
-          // TODO: Navigate to offspring
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Coming soon')),
-          );
-        },
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const OffspringListScreen()),
+        ),
       ),
       _MenuItem(
         icon: Icons.favorite,
         label: 'Breeding',
         color: Colors.red,
-        onTap: () {
-          // TODO: Navigate to breeding
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Coming soon')),
-          );
-        },
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const BreedingListScreen()),
+        ),
       ),
       _MenuItem(
         icon: Icons.account_balance_wallet,
