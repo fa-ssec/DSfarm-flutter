@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/breeding_record.dart';
 import '../models/offspring.dart';
+import '../models/reminder.dart';
 import '../repositories/breeding_repository.dart';
 import '../repositories/offspring_repository.dart';
 import '../repositories/reminder_repository.dart';
@@ -170,8 +171,8 @@ class BreedingNotifier extends StateNotifier<AsyncValue<List<BreedingRecord>>> {
             farmId: _farmId,
             breedingRecordId: id,
             code: code,
+            gender: Gender.unknown, // Will be determined later
             birthDate: actualBirthDate,
-            status: OffspringStatus.infarm,
           );
         }
 

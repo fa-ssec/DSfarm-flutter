@@ -184,7 +184,8 @@ class Offspring {
 /// Gender enum (reused from livestock)
 enum Gender {
   male('male', 'Jantan', '♂️'),
-  female('female', 'Betina', '♀️');
+  female('female', 'Betina', '♀️'),
+  unknown('unknown', 'Belum Diketahui', '❓');
 
   final String value;
   final String displayName;
@@ -195,7 +196,7 @@ enum Gender {
   static Gender fromString(String value) {
     return Gender.values.firstWhere(
       (e) => e.value == value,
-      orElse: () => Gender.female,
+      orElse: () => Gender.unknown,
     );
   }
 }
