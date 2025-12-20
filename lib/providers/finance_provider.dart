@@ -102,3 +102,59 @@ final financeNotifierProvider = StateNotifierProvider<FinanceNotifier, AsyncValu
   final farm = ref.watch(currentFarmProvider);
   return FinanceNotifier(repository, farm?.id);
 });
+
+/// Notifier for finance categories CRUD
+class FinanceCategoriesNotifier extends StateNotifier<AsyncValue<List<FinanceCategory>>> {
+  final FinanceRepository _repository;
+  final String? _farmId;
+
+  FinanceCategoriesNotifier(this._repository, this._farmId) : super(const AsyncValue.loading()) {
+    if (_farmId != null) loadCategories();
+  }
+
+  Future<void> loadCategories() async {
+    if (_farmId == null) {
+      state = const AsyncValue.data([]);
+      return;
+    }
+    
+    state = const AsyncValue.loading();
+    try {
+      final categories = await _repository.getCategories(_farmId);
+      state = AsyncValue.data(categories);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<FinanceCategory> create({
+    required String name,
+    required TransactionType type,
+    String? icon,
+  }) async {
+    if (_farmId == null) throw Exception('No farm selected');
+    
+    final category = await _repository.createCategory(
+      farmId: _farmId,
+      name: name,
+      type: type,
+      icon: icon,
+    );
+    
+    await loadCategories();
+    return category;
+  }
+
+  Future<void> delete(String id) async {
+    await _repository.deleteCategory(id);
+    await loadCategories();
+  }
+}
+
+/// Provider for FinanceCategoriesNotifier
+final financeCategoriesNotifierProvider = StateNotifierProvider<FinanceCategoriesNotifier, AsyncValue<List<FinanceCategory>>>((ref) {
+  final repository = ref.watch(financeRepositoryProvider);
+  final farm = ref.watch(currentFarmProvider);
+  return FinanceCategoriesNotifier(repository, farm?.id);
+});
+

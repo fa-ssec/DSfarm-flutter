@@ -22,6 +22,7 @@ import '../../inventory/screens/inventory_screen.dart';
 import '../../health/screens/health_screen.dart';
 import '../../reminder/screens/reminder_screen.dart';
 import '../../reports/screens/reports_screen.dart';
+import '../../settings/screens/settings_screen.dart';
 
 class DashboardScreen extends ConsumerWidget {
   final String farmId;
@@ -47,9 +48,10 @@ class DashboardScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {
-              // TODO: Navigate to settings
-            },
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
           ),
         ],
       ),
