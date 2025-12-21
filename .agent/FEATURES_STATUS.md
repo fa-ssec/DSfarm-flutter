@@ -59,10 +59,12 @@
 
 ## ❌ BELUM SELESAI
 
-### Finance Deep
-- [ ] Auto-income dari penjualan offspring
-- [ ] Laporan bulanan/tahunan
-- [ ] Grafik trend pemasukan/pengeluaran
+### Finance Deep ✅
+- [x] Auto-income dari penjualan offspring
+- [x] SellOffspringDialog dengan harga
+- [x] Trend chart (6 bulan terakhir)
+- [x] Finance Dashboard dengan grafik
+- [ ] Laporan bulanan/tahunan (export)
 - [ ] Budget planning
 
 ### Inventory Deep
