@@ -6,22 +6,107 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 
+import '../../../providers/farm_provider.dart';
 import '../../../providers/livestock_provider.dart';
 import '../../../providers/breeding_provider.dart';
 import '../../../providers/offspring_provider.dart';
 import '../../../providers/finance_provider.dart';
 import '../../../models/livestock.dart' show Gender;
 import '../../../models/offspring.dart' show OffspringStatus;
+import '../../../services/pdf_generator.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
+
+  void _showExportOptions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.sell, color: Colors.green),
+              title: const Text('Laporan Penjualan'),
+              subtitle: const Text('Export PDF penjualan anakan'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportSalesReport(context, ref);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet, color: Colors.blue),
+              title: const Text('Laporan Keuangan'),
+              subtitle: const Text('Export PDF ringkasan keuangan'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportFinanceReport(context, ref);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportSalesReport(BuildContext context, WidgetRef ref) async {
+    final farm = ref.read(currentFarmProvider);
+    if (farm == null) return;
+
+    final offspringsAsync = ref.read(offspringNotifierProvider);
+    final offsprings = offspringsAsync.valueOrNull ?? [];
+    final soldOffsprings = offsprings.where((o) => o.status == OffspringStatus.sold).toList();
+
+    final endDate = DateTime.now();
+    final startDate = endDate.subtract(const Duration(days: 30));
+
+    final pdf = PdfGenerator.generateSalesReport(
+      farmName: farm.name,
+      soldOffsprings: soldOffsprings,
+      startDate: startDate,
+      endDate: endDate,
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
+  Future<void> _exportFinanceReport(BuildContext context, WidgetRef ref) async {
+    final farm = ref.read(currentFarmProvider);
+    if (farm == null) return;
+
+    final transAsync = ref.read(financeNotifierProvider);
+    final transactions = transAsync.valueOrNull ?? [];
+    final summaryAsync = ref.read(financeSummaryProvider);
+    final summary = summaryAsync.valueOrNull ?? {'income': 0, 'expense': 0};
+
+    final endDate = DateTime.now();
+    final startDate = endDate.subtract(const Duration(days: 30));
+
+    final pdf = PdfGenerator.generateFinanceSummary(
+      farmName: farm.name,
+      transactions: transactions,
+      summary: summary,
+      startDate: startDate,
+      endDate: endDate,
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Laporan'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Export PDF',
+            onPressed: () => _showExportOptions(context, ref),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

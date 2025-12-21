@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/offspring.dart';
 import '../../../providers/offspring_provider.dart';
+import 'batch_sell_screen.dart';
 
 class OffspringListScreen extends ConsumerStatefulWidget {
   const OffspringListScreen({super.key});
@@ -59,13 +60,44 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navigate to add offspring
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tambah anakan via Breeding Record')),
-          );
-        },
+        onPressed: () => _showAddOptions(context),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _showAddOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.sell, color: Colors.green),
+              title: const Text('Jual Batch'),
+              subtitle: const Text('Jual banyak anakan sekaligus'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BatchSellScreen()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.info_outline, color: Colors.blue),
+              title: const Text('Tambah Anakan'),
+              subtitle: const Text('Via Breeding Record'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Tambah anakan via Breeding Record')),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
