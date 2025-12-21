@@ -216,11 +216,21 @@ class _HousingCard extends StatelessWidget {
 
   const _HousingCard({required this.housing, required this.onTap});
 
+  /// Get color based on level (location)
+  Color _getLevelColor() {
+    final level = housing.level?.toUpperCase() ?? '';
+    if (level.startsWith('A')) return Colors.blue;
+    if (level.startsWith('T')) return Colors.orange;
+    if (level.startsWith('B')) return Colors.green;
+    return Colors.grey; // default no level
+  }
+
   @override
   Widget build(BuildContext context) {
     final occupancy = housing.currentOccupancy ?? 0;
     final isFull = occupancy >= housing.capacity;
-    final color = isFull ? Colors.purple : Colors.green;
+    final levelColor = _getLevelColor();
+    final occupancyColor = isFull ? Colors.purple : Colors.green;
 
     return InkWell(
       onTap: onTap,
@@ -229,22 +239,22 @@ class _HousingCard extends StatelessWidget {
         width: 72,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withAlpha(15),
+          color: levelColor.withAlpha(15),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withAlpha(40)),
+          border: Border.all(color: levelColor.withAlpha(60), width: 1.5),
         ),
         child: Column(
           children: [
-            // Dot indicator
+            // Dot indicator (occupancy)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.home, size: 16, color: color),
+                Icon(Icons.home, size: 16, color: levelColor),
                 Container(
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: isFull ? Colors.purple : Colors.green,
+                    color: occupancyColor,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -257,7 +267,7 @@ class _HousingCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: color,
+                color: levelColor.withAlpha(200),
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -278,6 +288,22 @@ class _HousingDetailSheet extends ConsumerWidget {
 
   const _HousingDetailSheet({required this.housing});
 
+  Color _getLevelColor() {
+    final level = housing.level?.toUpperCase() ?? '';
+    if (level.startsWith('A')) return Colors.blue;
+    if (level.startsWith('T')) return Colors.orange;
+    if (level.startsWith('B')) return Colors.green;
+    return Colors.grey;
+  }
+
+  String _getLevelName() {
+    final level = housing.level?.toUpperCase() ?? '';
+    if (level.startsWith('A')) return 'Atas';
+    if (level.startsWith('T')) return 'Tengah';
+    if (level.startsWith('B')) return 'Bawah';
+    return housing.level ?? 'Tidak ada';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Get livestock in this housing
@@ -285,6 +311,7 @@ class _HousingDetailSheet extends ConsumerWidget {
     final occupants = livestockAsync.valueOrNull
         ?.where((l) => l.housingId == housing.id)
         .toList() ?? [];
+    final levelColor = _getLevelColor();
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -292,16 +319,17 @@ class _HousingDetailSheet extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
+          // Header with level color
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.green.withAlpha(25),
+                  color: levelColor.withAlpha(25),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: levelColor.withAlpha(80)),
                 ),
-                child: const Icon(Icons.home_work, color: Colors.green),
+                child: Icon(Icons.home_work, color: levelColor),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -313,18 +341,33 @@ class _HousingDetailSheet extends ConsumerWidget {
                   ],
                 ),
               ),
-              if (housing.level != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withAlpha(25),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(housing.level!, style: const TextStyle(fontSize: 12)),
-                ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // Location info row
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: levelColor.withAlpha(15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.location_on, size: 18, color: levelColor),
+                const SizedBox(width: 8),
+                Text('Lokasi: ', style: TextStyle(color: Colors.grey[600])),
+                Text(
+                  _getLevelName(),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: levelColor),
+                ),
+                if (housing.level != null && housing.level!.length > 1) ...[
+                  Text(' (${housing.level})', style: TextStyle(color: Colors.grey[500])),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           
           // Occupants
           Text(

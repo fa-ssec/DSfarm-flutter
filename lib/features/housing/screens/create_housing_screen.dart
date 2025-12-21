@@ -189,10 +189,13 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: _levelController,
-                      inputFormatters: [_UpperCaseLettersFormatter()],
+                      inputFormatters: [
+                        _UpperCaseLettersFormatter(),
+                        LengthLimitingTextInputFormatter(5),
+                      ],
                       decoration: const InputDecoration(
                         labelText: 'Lokasi',
-                        hintText: 'A, B, T',
+                        hintText: 'A, T, B (maks 5)',
                       ),
                     ),
                   ),
