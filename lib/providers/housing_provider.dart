@@ -106,6 +106,50 @@ class HousingNotifier extends StateNotifier<AsyncValue<List<Housing>>> {
     await _repository.delete(id);
     await loadHousings();
   }
+
+  /// Create multiple housings with same settings
+  Future<void> createBatch({
+    required String blockCode,
+    required int count,
+    int capacity = 1,
+    String? level,
+    String? notes,
+  }) async {
+    if (_farmId == null) throw Exception('No farm selected');
+    
+    // Get next starting number for this block
+    final existingHousings = state.valueOrNull ?? [];
+    final blockHousings = existingHousings.where(
+      (h) => h.code.toUpperCase().startsWith('${blockCode.toUpperCase()}-')
+    ).toList();
+    
+    int startNum = 1;
+    for (final h in blockHousings) {
+      final parts = h.code.split('-');
+      if (parts.length >= 2) {
+        final num = int.tryParse(parts.last) ?? 0;
+        if (num >= startNum) startNum = num + 1;
+      }
+    }
+    
+    // Create housings in batch
+    for (int i = 0; i < count; i++) {
+      final num = startNum + i;
+      final code = '${blockCode.toUpperCase()}-${num.toString().padLeft(2, '0')}';
+      
+      await _repository.create(
+        farmId: _farmId,
+        code: code,
+        name: null,
+        position: code,
+        level: level,
+        capacity: capacity,
+        notes: notes,
+      );
+    }
+    
+    await loadHousings();
+  }
 }
 
 /// Provider for HousingNotifier

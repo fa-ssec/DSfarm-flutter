@@ -1,13 +1,13 @@
-/// Create Housing Screen
+/// Create Housing Screen (Unified)
 /// 
-/// Form untuk menambah kandang baru.
+/// Form untuk menambah 1 atau banyak kandang sekaligus.
 
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../models/housing.dart';
 import '../../../providers/housing_provider.dart';
 
 class CreateHousingScreen extends ConsumerStatefulWidget {
@@ -19,23 +19,37 @@ class CreateHousingScreen extends ConsumerStatefulWidget {
 
 class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _codeController = TextEditingController();
-  final _nameController = TextEditingController();
   final _blockController = TextEditingController();
+  final _countController = TextEditingController(text: '1');
   final _capacityController = TextEditingController(text: '1');
   final _notesController = TextEditingController();
   
-  HousingType _selectedType = HousingType.individual;
+  String _selectedLevel = 'bawah';
   bool _isLoading = false;
+
+  static const _levels = ['bawah', 'tengah', 'atas'];
 
   @override
   void dispose() {
-    _codeController.dispose();
-    _nameController.dispose();
     _blockController.dispose();
+    _countController.dispose();
     _capacityController.dispose();
     _notesController.dispose();
     super.dispose();
+  }
+
+  /// Preview text showing what will be created
+  String get _previewText {
+    final block = _blockController.text.trim().toUpperCase();
+    final count = int.tryParse(_countController.text) ?? 1;
+    
+    if (block.isEmpty) return '';
+    
+    if (count == 1) {
+      return 'Akan dibuat: $block-01';
+    } else {
+      return 'Akan dibuat: $block-01 sampai $block-${count.toString().padLeft(2, '0')} ($count kandang)';
+    }
   }
 
   Future<void> _handleSubmit() async {
@@ -44,25 +58,24 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(housingNotifierProvider.notifier).create(
-        code: _codeController.text.trim(),
-        name: _nameController.text.trim().isEmpty 
-            ? null 
-            : _nameController.text.trim(),
-        position: _blockController.text.trim().isEmpty 
-            ? null 
-            : _blockController.text.trim(),
-        capacity: int.tryParse(_capacityController.text) ?? 1,
-        type: _selectedType,
-        notes: _notesController.text.trim().isEmpty 
-            ? null 
-            : _notesController.text.trim(),
+      final block = _blockController.text.trim().toUpperCase();
+      final count = int.tryParse(_countController.text) ?? 1;
+      final capacity = int.tryParse(_capacityController.text) ?? 1;
+      final notes = _notesController.text.trim().isEmpty ? null : _notesController.text.trim();
+
+      // Create batch
+      await ref.read(housingNotifierProvider.notifier).createBatch(
+        blockCode: block,
+        count: count,
+        capacity: capacity,
+        level: _selectedLevel,
+        notes: notes,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Kandang ${_codeController.text} berhasil ditambahkan!'),
+            content: Text('$count kandang berhasil ditambahkan!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -71,25 +84,18 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tambah Kandang'),
-      ),
+      appBar: AppBar(title: const Text('Tambah Kandang')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -97,106 +103,125 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Code
-              TextFormField(
-                controller: _codeController,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Kode Kandang *',
-                  hintText: 'Contoh: K-001, A-01',
-                  prefixIcon: Icon(Icons.tag),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Kode kandang tidak boleh kosong';
-                  }
-                  return null;
-                },
+              // Block Code
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _blockController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        labelText: 'Blok Kandang *',
+                        hintText: 'AA, TEST, BLOK-A',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) => v?.trim().isEmpty == true ? 'Wajib diisi' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _countController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: 'Jumlah *',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) {
+                        final n = int.tryParse(v ?? '');
+                        if (n == null || n < 1) return 'Min 1';
+                        if (n > 100) return 'Max 100';
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
               ),
+              
+              // Preview
+              if (_previewText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    _previewText,
+                    style: TextStyle(color: Colors.green[700], fontSize: 12),
+                  ),
+                ),
               const SizedBox(height: 16),
 
-              // Name (optional)
-              TextFormField(
-                controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Nama (Opsional)',
-                  hintText: 'Contoh: Kandang Induk 1',
-                  prefixIcon: Icon(Icons.label_outline),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Block
-              TextFormField(
-                controller: _blockController,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Blok (Opsional)',
-                  hintText: 'Contoh: A, B, Blok Utara',
-                  prefixIcon: Icon(Icons.grid_view),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Type
-              DropdownButtonFormField<HousingType>(
-                value: _selectedType,
-                decoration: const InputDecoration(
-                  labelText: 'Tipe Kandang',
-                  prefixIcon: Icon(Icons.category),
-                ),
-                items: HousingType.values.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type.displayName),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedType = value);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Capacity
-              TextFormField(
-                controller: _capacityController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Kapasitas',
-                  hintText: 'Jumlah maksimal hewan',
-                  prefixIcon: Icon(Icons.people),
-                  suffixText: 'ekor',
-                ),
-                validator: (value) {
-                  if (value != null && value.isNotEmpty) {
-                    final num = int.tryParse(value);
-                    if (num == null || num < 1) {
-                      return 'Kapasitas minimal 1';
-                    }
-                  }
-                  return null;
-                },
+              // Capacity & Level
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _capacityController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: 'Kapasitas/Kandang *',
+                        helperText: 'Maks kelinci per kandang',
+                      ),
+                      validator: (v) {
+                        final n = int.tryParse(v ?? '');
+                        if (n == null || n < 1) return 'Min 1';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedLevel,
+                      decoration: const InputDecoration(
+                        labelText: 'Lokasi',
+                      ),
+                      items: _levels.map((l) => DropdownMenuItem(
+                        value: l,
+                        child: Text(l[0].toUpperCase() + l.substring(1)),
+                      )).toList(),
+                      onChanged: (v) => setState(() => _selectedLevel = v ?? 'bawah'),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
 
               // Notes
               TextFormField(
                 controller: _notesController,
-                maxLines: 3,
+                maxLines: 2,
                 decoration: const InputDecoration(
-                  labelText: 'Catatan (Opsional)',
+                  labelText: 'Deskripsi (Opsional)',
                   hintText: 'Catatan tambahan...',
-                  prefixIcon: Padding(
-                    padding: EdgeInsets.only(bottom: 40),
-                    child: Icon(Icons.notes),
-                  ),
-                  alignLabelWithHint: true,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
+
+              // Info box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Kode kandang menggunakan format: [Blok]-[Nomor]',
+                      style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Contoh: A-01, B-02, Indoor-03',
+                      style: TextStyle(color: Colors.blue[600], fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
 
               // Submit
               SizedBox(
@@ -207,10 +232,7 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Text('Simpan'),
                 ),
