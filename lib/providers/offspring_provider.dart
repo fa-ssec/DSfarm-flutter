@@ -5,7 +5,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/offspring.dart';
+import '../models/finance.dart';
 import '../repositories/offspring_repository.dart';
+import '../repositories/finance_repository.dart';
 import '../providers/farm_provider.dart';
 
 /// Repository provider
@@ -43,9 +45,10 @@ final offspringCountProvider = FutureProvider<Map<OffspringStatus, int>>((ref) a
 /// Notifier for offspring CRUD operations
 class OffspringNotifier extends StateNotifier<AsyncValue<List<Offspring>>> {
   final OffspringRepository _repository;
+  final FinanceRepository _financeRepository;
   final String? _farmId;
 
-  OffspringNotifier(this._repository, this._farmId) 
+  OffspringNotifier(this._repository, this._financeRepository, this._farmId) 
       : super(_farmId == null ? const AsyncValue.data([]) : const AsyncValue.loading()) {
     if (_farmId != null) loadOffsprings();
   }
@@ -108,6 +111,43 @@ class OffspringNotifier extends StateNotifier<AsyncValue<List<Offspring>>> {
     await loadOffsprings();
   }
 
+  /// Sell offspring and auto-create income transaction
+  Future<void> sellOffspring({
+    required String offspringId,
+    required double salePrice,
+    DateTime? saleDate,
+    String? description,
+  }) async {
+    if (_farmId == null) throw Exception('No farm selected');
+    
+    final effectiveSaleDate = saleDate ?? DateTime.now();
+    
+    // 1. Update offspring status to terjual
+    await _repository.updateStatus(
+      offspringId, 
+      OffspringStatus.sold,
+      salePrice: salePrice,
+      saleDate: effectiveSaleDate,
+    );
+    
+    // 2. Get or create sale category
+    final category = await _financeRepository.getOrCreateSaleCategory(_farmId);
+    
+    // 3. Create income transaction
+    await _financeRepository.createTransaction(
+      farmId: _farmId,
+      type: TransactionType.income,
+      categoryId: category.id,
+      amount: salePrice,
+      transactionDate: effectiveSaleDate,
+      description: description ?? 'Penjualan anakan',
+      referenceId: offspringId,
+      referenceType: 'offspring',
+    );
+    
+    await loadOffsprings();
+  }
+
   Future<void> markAsWeaned(String id) async {
     await _repository.markAsWeaned(id, DateTime.now());
     await loadOffsprings();
@@ -119,9 +159,15 @@ class OffspringNotifier extends StateNotifier<AsyncValue<List<Offspring>>> {
   }
 }
 
+/// Finance repository provider (for offspring)
+final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
+  return FinanceRepository();
+});
+
 /// Provider for OffspringNotifier
 final offspringNotifierProvider = StateNotifierProvider<OffspringNotifier, AsyncValue<List<Offspring>>>((ref) {
   final repository = ref.watch(offspringRepositoryProvider);
+  final financeRepository = ref.watch(financeRepositoryProvider);
   final farm = ref.watch(currentFarmProvider);
-  return OffspringNotifier(repository, farm?.id);
+  return OffspringNotifier(repository, financeRepository, farm?.id);
 });

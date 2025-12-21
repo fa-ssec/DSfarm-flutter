@@ -163,4 +163,29 @@ class FinanceRepository {
         .delete()
         .eq('id', id);
   }
+
+  /// Get or create default sale category for offspring
+  Future<FinanceCategory> getOrCreateSaleCategory(String farmId) async {
+    const saleCategoryName = 'Penjualan Anakan';
+    
+    // Try to find existing
+    final existing = await SupabaseService.client
+        .from(_categoriesTable)
+        .select()
+        .eq('farm_id', farmId)
+        .eq('name', saleCategoryName)
+        .maybeSingle();
+    
+    if (existing != null) {
+      return FinanceCategory.fromJson(existing);
+    }
+    
+    // Create new
+    return createCategory(
+      farmId: farmId,
+      name: saleCategoryName,
+      type: TransactionType.income,
+      icon: '🐰',
+    );
+  }
 }
