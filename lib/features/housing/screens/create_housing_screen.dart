@@ -17,23 +17,36 @@ class CreateHousingScreen extends ConsumerStatefulWidget {
   ConsumerState<CreateHousingScreen> createState() => _CreateHousingScreenState();
 }
 
+/// Input formatter for uppercase letters only
+class _UpperCaseLettersFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), ''),
+      selection: newValue.selection,
+    );
+  }
+}
+
 class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _blockController = TextEditingController();
   final _countController = TextEditingController(text: '1');
   final _capacityController = TextEditingController(text: '1');
+  final _levelController = TextEditingController();
   final _notesController = TextEditingController();
   
-  String _selectedLevel = 'bawah';
   bool _isLoading = false;
-
-  static const _levels = ['bawah', 'tengah', 'atas'];
 
   @override
   void dispose() {
     _blockController.dispose();
     _countController.dispose();
     _capacityController.dispose();
+    _levelController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -64,11 +77,13 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
       final notes = _notesController.text.trim().isEmpty ? null : _notesController.text.trim();
 
       // Create batch
+      final level = _levelController.text.trim().isEmpty ? null : _levelController.text.trim().toUpperCase();
+      
       await ref.read(housingNotifierProvider.notifier).createBatch(
         blockCode: block,
         count: count,
         capacity: capacity,
-        level: _selectedLevel,
+        level: level,
         notes: notes,
       );
 
@@ -110,10 +125,10 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
                     flex: 2,
                     child: TextFormField(
                       controller: _blockController,
-                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [_UpperCaseLettersFormatter()],
                       decoration: const InputDecoration(
                         labelText: 'Blok Kandang *',
-                        hintText: 'AA, TEST, BLOK-A',
+                        hintText: 'AA, TEST',
                       ),
                       onChanged: (_) => setState(() {}),
                       validator: (v) => v?.trim().isEmpty == true ? 'Wajib diisi' : null,
@@ -172,16 +187,13 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedLevel,
+                    child: TextFormField(
+                      controller: _levelController,
+                      inputFormatters: [_UpperCaseLettersFormatter()],
                       decoration: const InputDecoration(
                         labelText: 'Lokasi',
+                        hintText: 'A, B, T',
                       ),
-                      items: _levels.map((l) => DropdownMenuItem(
-                        value: l,
-                        child: Text(l[0].toUpperCase() + l.substring(1)),
-                      )).toList(),
-                      onChanged: (v) => setState(() => _selectedLevel = v ?? 'bawah'),
                     ),
                   ),
                 ],
