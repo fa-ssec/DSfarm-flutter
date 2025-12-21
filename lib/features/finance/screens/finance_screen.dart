@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/finance.dart';
 import '../../../providers/finance_provider.dart';
+import 'finance_dashboard_screen.dart';
 
 class FinanceScreen extends ConsumerStatefulWidget {
   const FinanceScreen({super.key});
@@ -40,6 +41,16 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Keuangan'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: 'Laporan & Grafik',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FinanceDashboardScreen()),
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

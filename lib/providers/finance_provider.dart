@@ -160,3 +160,44 @@ final financeCategoriesNotifierProvider = StateNotifierProvider<FinanceCategorie
   return FinanceCategoriesNotifier(repository, farm?.id);
 });
 
+/// Monthly trend data for charts
+class MonthlyTrendData {
+  final String month; // "Jan", "Feb", etc
+  final double income;
+  final double expense;
+
+  MonthlyTrendData({required this.month, required this.income, required this.expense});
+  
+  double get balance => income - expense;
+}
+
+/// Provider for monthly trend (last 6 months)
+final monthlyTrendProvider = FutureProvider<List<MonthlyTrendData>>((ref) async {
+  final farm = ref.watch(currentFarmProvider);
+  if (farm == null) return [];
+  
+  final repository = ref.watch(financeRepositoryProvider);
+  final now = DateTime.now();
+  final List<MonthlyTrendData> result = [];
+  
+  // Get data for last 6 months
+  for (int i = 5; i >= 0; i--) {
+    final monthStart = DateTime(now.year, now.month - i, 1);
+    final monthEnd = DateTime(now.year, now.month - i + 1, 0);
+    
+    final summary = await repository.getSummary(
+      farm.id,
+      startDate: monthStart,
+      endDate: monthEnd,
+    );
+    
+    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    result.add(MonthlyTrendData(
+      month: monthNames[(monthStart.month - 1) % 12],
+      income: summary['income'] ?? 0,
+      expense: summary['expense'] ?? 0,
+    ));
+  }
+  
+  return result;
+});
