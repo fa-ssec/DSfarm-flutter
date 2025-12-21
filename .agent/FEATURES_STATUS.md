@@ -1,7 +1,7 @@
 # DSFarm Features Status
 
 > **Updated:** 2025-12-21  
-> **Total Features:** 45+ | **Done:** 30 | **Pending:** 15+
+> **Total Features:** 45+ | **Done:** 32 | **Pending:** 13+
 
 ---
 
