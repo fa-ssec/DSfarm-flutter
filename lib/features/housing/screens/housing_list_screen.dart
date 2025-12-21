@@ -86,7 +86,7 @@ class HousingListScreen extends ConsumerWidget {
     // Group by block
     final grouped = <String, List<Housing>>{};
     for (final housing in housings) {
-      final block = housing.block ?? 'Tanpa Blok';
+      final block = housing.blockCode ?? 'Tanpa Blok';
       grouped.putIfAbsent(block, () => []);
       grouped[block]!.add(housing);
     }
@@ -193,7 +193,7 @@ class HousingListScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              _DetailRow(label: 'Blok', value: housing.block ?? '-'),
+              _DetailRow(label: 'Blok', value: housing.blockCode ?? housing.position ?? '-'),
               _DetailRow(label: 'Kapasitas', value: '${housing.capacity} ekor'),
               _DetailRow(label: 'Tipe', value: housing.type.displayName),
               _DetailRow(label: 'Status', value: housing.status.displayName),

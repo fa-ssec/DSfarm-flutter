@@ -49,7 +49,7 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
         name: _nameController.text.trim().isEmpty 
             ? null 
             : _nameController.text.trim(),
-        block: _blockController.text.trim().isEmpty 
+        position: _blockController.text.trim().isEmpty 
             ? null 
             : _blockController.text.trim(),
         capacity: int.tryParse(_capacityController.text) ?? 1,

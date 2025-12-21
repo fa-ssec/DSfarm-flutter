@@ -14,9 +14,9 @@ class HousingRepository {
   Future<List<Housing>> getByFarm(String farmId) async {
     final response = await SupabaseService.client
         .from(_tableName)
-        .select()
+        .select('*, blocks(code)')
         .eq('farm_id', farmId)
-        .order('block')
+        .order('position')
         .order('code');
 
     return (response as List)
@@ -30,7 +30,7 @@ class HousingRepository {
     final grouped = <String, List<Housing>>{};
     
     for (final housing in housings) {
-      final block = housing.block ?? 'Tanpa Blok';
+      final block = housing.blockCode ?? 'Tanpa Blok';
       grouped.putIfAbsent(block, () => []);
       grouped[block]!.add(housing);
     }
@@ -55,7 +55,11 @@ class HousingRepository {
     required String farmId,
     required String code,
     String? name,
-    String? block,
+    String? blockId,
+    String? position,
+    int? column,
+    int? row,
+    String? level,
     int capacity = 1,
     HousingType type = HousingType.individual,
     String? notes,
@@ -66,13 +70,17 @@ class HousingRepository {
           'farm_id': farmId,
           'code': code,
           'name': name,
-          'block': block,
+          'block_id': blockId,
+          'position': position,
+          'column_num': column,
+          'row_num': row,
+          'level': level,
           'capacity': capacity,
           'housing_type': type.value,
           'status': 'active',
           'notes': notes,
         })
-        .select()
+        .select('*, blocks(code)')
         .single();
 
     return Housing.fromJson(response);
@@ -85,7 +93,11 @@ class HousingRepository {
         .update({
           'code': housing.code,
           'name': housing.name,
-          'block': housing.block,
+          'block_id': housing.blockId,
+          'position': housing.position,
+          'column_num': housing.column,
+          'row_num': housing.row,
+          'level': housing.level,
           'capacity': housing.capacity,
           'housing_type': housing.type.value,
           'status': housing.status.value,
@@ -93,7 +105,7 @@ class HousingRepository {
           'updated_at': DateTime.now().toIso8601String(),
         })
         .eq('id', housing.id)
-        .select()
+        .select('*, blocks(code)')
         .single();
 
     return Housing.fromJson(response);
@@ -119,14 +131,12 @@ class HousingRepository {
 
   /// Get available housings (with space) for a farm
   Future<List<Housing>> getAvailable(String farmId) async {
-    // This would need a more complex query with occupancy count
-    // For now, return all active housings
     final response = await SupabaseService.client
         .from(_tableName)
-        .select()
+        .select('*, blocks(code)')
         .eq('farm_id', farmId)
         .eq('status', 'active')
-        .order('block')
+        .order('position')
         .order('code');
 
     return (response as List)
