@@ -182,47 +182,105 @@ class DashboardScreen extends ConsumerWidget {
     AsyncValue<dynamic> housingsAsync,
     AsyncValue<Map<Gender, int>> livestockCountAsync,
   ) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            icon: Icons.home_work,
-            label: 'Kandang',
-            value: housingsAsync.when(
-              loading: () => '...',
-              error: (_, __) => '-',
-              data: (housings) => '${housings.length}',
+    return Consumer(
+      builder: (context, ref, _) {
+        final statsAsync = ref.watch(livestockStatsProvider);
+        
+        return Column(
+          children: [
+            // Row 1: Kandang, Total, InFarm, Keluar
+            Row(
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.home_work,
+                    label: 'Kandang',
+                    value: housingsAsync.when(
+                      loading: () => '...',
+                      error: (_, __) => '-',
+                      data: (housings) => '${housings.length}',
+                    ),
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.pets,
+                    label: 'Total',
+                    value: statsAsync.when(
+                      loading: () => '...',
+                      error: (_, __) => '-',
+                      data: (stats) => '${stats.total}',
+                    ),
+                    color: Colors.purple,
+                    subtitle: 'pernah dimiliki',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.home,
+                    label: 'InFarm',
+                    value: statsAsync.when(
+                      loading: () => '...',
+                      error: (_, __) => '-',
+                      data: (stats) => '${stats.infarm}',
+                    ),
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.logout,
+                    label: 'Keluar',
+                    value: statsAsync.when(
+                      loading: () => '...',
+                      error: (_, __) => '-',
+                      data: (stats) => '${stats.keluar}',
+                    ),
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
             ),
-            color: Colors.blue,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.female,
-            label: 'Induk',
-            value: livestockCountAsync.when(
-              loading: () => '...',
-              error: (_, __) => '-',
-              data: (counts) => '${counts[Gender.female] ?? 0}',
+            const SizedBox(height: 8),
+            // Row 2: Gender breakdown (infarm only)
+            Row(
+              children: [
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.female,
+                    label: 'Induk',
+                    value: statsAsync.when(
+                      loading: () => '...',
+                      error: (_, __) => '-',
+                      data: (stats) => '${stats.femaleInfarm}',
+                    ),
+                    color: Colors.pink,
+                    subtitle: 'di farm',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.male,
+                    label: 'Pejantan',
+                    value: statsAsync.when(
+                      loading: () => '...',
+                      error: (_, __) => '-',
+                      data: (stats) => '${stats.maleInfarm}',
+                    ),
+                    color: Colors.blue,
+                    subtitle: 'di farm',
+                  ),
+                ),
+              ],
             ),
-            color: Colors.pink,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.male,
-            label: 'Pejantan',
-            value: livestockCountAsync.when(
-              loading: () => '...',
-              error: (_, __) => '-',
-              data: (counts) => '${counts[Gender.male] ?? 0}',
-            ),
-            color: Colors.blue,
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -370,27 +428,30 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
+  final String? subtitle;
 
   const _StatCard({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 4),
             Text(
               value,
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
@@ -398,10 +459,20 @@ class _StatCard extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: Colors.grey[600],
               ),
+              textAlign: TextAlign.center,
             ),
+            if (subtitle != null)
+              Text(
+                subtitle!,
+                style: TextStyle(
+                  fontSize: 9,
+                  color: Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
           ],
         ),
       ),

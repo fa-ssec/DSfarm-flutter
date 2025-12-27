@@ -153,6 +153,19 @@ class OffspringNotifier extends StateNotifier<AsyncValue<List<Offspring>>> {
     await loadOffsprings();
   }
 
+  /// Promote offspring to livestock (indukan)
+  Future<void> promoteToLivestock(String offspringId) async {
+    if (_farmId == null) throw Exception('No farm selected');
+    
+    final offspring = state.value?.firstWhere((o) => o.id == offspringId);
+    if (offspring == null) throw Exception('Offspring not found');
+    
+    // Create livestock from offspring via repository
+    await _repository.promoteToLivestock(offspringId);
+    
+    await loadOffsprings();
+  }
+
   Future<void> delete(String id) async {
     await _repository.delete(id);
     await loadOffsprings();

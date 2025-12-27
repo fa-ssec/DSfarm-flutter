@@ -13,6 +13,9 @@ import '../../../providers/breeding_provider.dart';
 import '../../../providers/livestock_provider.dart';
 import '../../../animal_modules/base/animal_config_factory.dart';
 import '../../../providers/farm_provider.dart';
+import '../../../widgets/shimmer_widgets.dart';
+import 'breeding_analytics_screen.dart';
+import 'breeding_calendar_screen.dart';
 
 class BreedingListScreen extends ConsumerWidget {
   const BreedingListScreen({super.key});
@@ -24,9 +27,52 @@ class BreedingListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Breeding'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              switch (value) {
+                case 'analytics':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BreedingAnalyticsScreen()),
+                  );
+                  break;
+                case 'calendar':
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BreedingCalendarScreen()),
+                  );
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'analytics',
+                child: Row(
+                  children: [
+                    Icon(Icons.bar_chart, size: 20),
+                    SizedBox(width: 12),
+                    Text('Analitik'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'calendar',
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_month, size: 20),
+                    SizedBox(width: 12),
+                    Text('Kalender'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: breedingAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const ShimmerList(itemCount: 5),
         error: (error, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -460,8 +506,7 @@ class BreedingListScreen extends ConsumerWidget {
               final dead = int.tryParse(deadController.text) ?? 0;
               await ref.read(breedingNotifierProvider.notifier).updateBirth(
                 id: record.id,
-                actualBirthDate: DateTime.now(),
-                birthCount: alive + dead,
+                birthDate: DateTime.now(),
                 aliveCount: alive,
                 deadCount: dead,
               );

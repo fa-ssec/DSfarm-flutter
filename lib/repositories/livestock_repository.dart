@@ -10,17 +10,19 @@ import '../models/livestock.dart';
 class LivestockRepository {
   static const String _tableName = 'livestocks';
 
-  /// Get all livestock for a farm
+  /// Get all livestock for a farm (excluding sold/deceased/culled)
   Future<List<Livestock>> getByFarm(String farmId) async {
     final response = await SupabaseService.client
         .from(_tableName)
         .select('''
           *,
           housings:housing_id(code),
-          breeds:breed_id(name)
+          breeds:breed_id(name),
+          mother:mother_id(code),
+          father:father_id(code)
         ''')
         .eq('farm_id', farmId)
-        .eq('status', 'active')
+        .not('status', 'in', '(sold,deceased,culled)')
         .order('code');
 
     return (response as List)
@@ -28,18 +30,20 @@ class LivestockRepository {
         .toList();
   }
 
-  /// Get livestock by gender
+  /// Get livestock by gender (excluding sold/deceased/culled)
   Future<List<Livestock>> getByGender(String farmId, Gender gender) async {
     final response = await SupabaseService.client
         .from(_tableName)
         .select('''
           *,
           housings:housing_id(code),
-          breeds:breed_id(name)
+          breeds:breed_id(name),
+          mother:mother_id(code),
+          father:father_id(code)
         ''')
         .eq('farm_id', farmId)
         .eq('gender', gender.value)
-        .eq('status', 'active')
+        .not('status', 'in', '(sold,deceased,culled)')
         .order('code');
 
     return (response as List)
@@ -64,7 +68,9 @@ class LivestockRepository {
         .select('''
           *,
           housings:housing_id(code),
-          breeds:breed_id(name)
+          breeds:breed_id(name),
+          mother:mother_id(code),
+          father:father_id(code)
         ''')
         .eq('id', id)
         .maybeSingle();
@@ -85,10 +91,15 @@ class LivestockRepository {
     DateTime? acquisitionDate,
     AcquisitionType acquisitionType = AcquisitionType.purchased,
     double? purchasePrice,
+    LivestockStatus? status,
     int generation = 1,
     double? weight,
     String? notes,
+    String? motherId,
+    String? fatherId,
   }) async {
+    final effectiveStatus = status ?? LivestockStatus.defaultFor(gender);
+    
     final response = await SupabaseService.client
         .from(_tableName)
         .insert({
@@ -102,15 +113,19 @@ class LivestockRepository {
           'acquisition_date': acquisitionDate?.toIso8601String().split('T').first,
           'acquisition_type': acquisitionType.value,
           'purchase_price': purchasePrice,
-          'status': 'active',
+          'status': effectiveStatus.value,
           'generation': generation,
           'weight': weight,
           'notes': notes,
+          'mother_id': motherId,
+          'father_id': fatherId,
         })
         .select('''
           *,
           housings:housing_id(code),
-          breeds:breed_id(name)
+          breeds:breed_id(name),
+          mother:mother_id(code),
+          father:father_id(code)
         ''')
         .single();
 
@@ -168,30 +183,58 @@ class LivestockRepository {
         .eq('id', id);
   }
 
-  /// Get livestock count for a farm
+  /// Get livestock count for a farm (excluding sold/deceased/culled)
   Future<int> getCount(String farmId) async {
     final response = await SupabaseService.client
         .from(_tableName)
         .select('id')
         .eq('farm_id', farmId)
-        .eq('status', 'active');
+        .not('status', 'in', '(sold,deceased,culled)');
 
     return (response as List).length;
   }
 
-  /// Get livestock count by gender
+  /// Get livestock count by gender (excluding sold/deceased/culled)
   Future<Map<Gender, int>> getCountByGender(String farmId) async {
     final response = await SupabaseService.client
         .from(_tableName)
         .select('gender')
         .eq('farm_id', farmId)
-        .eq('status', 'active');
+        .not('status', 'in', '(sold,deceased,culled)');
 
     final list = response as List;
     return {
       Gender.male: list.where((e) => e['gender'] == 'male').length,
       Gender.female: list.where((e) => e['gender'] == 'female').length,
     };
+  }
+
+  /// Get full statistics for livestock
+  /// Returns: total (ever owned), infarm (active), keluar (exited)
+  Future<LivestockStats> getFullStats(String farmId) async {
+    final response = await SupabaseService.client
+        .from(_tableName)
+        .select('status, gender')
+        .eq('farm_id', farmId);
+
+    final list = response as List;
+    final exitedStatuses = ['sold', 'deceased', 'culled'];
+    
+    final infarm = list.where((e) => !exitedStatuses.contains(e['status'])).length;
+    final keluar = list.where((e) => exitedStatuses.contains(e['status'])).length;
+    
+    // Gender breakdown for infarm only
+    final infarmList = list.where((e) => !exitedStatuses.contains(e['status']));
+    final maleInfarm = infarmList.where((e) => e['gender'] == 'male').length;
+    final femaleInfarm = infarmList.where((e) => e['gender'] == 'female').length;
+    
+    return LivestockStats(
+      total: list.length,
+      infarm: infarm,
+      keluar: keluar,
+      maleInfarm: maleInfarm,
+      femaleInfarm: femaleInfarm,
+    );
   }
 
   /// Generate next code for livestock

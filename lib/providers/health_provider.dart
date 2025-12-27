@@ -28,6 +28,12 @@ final healthByLivestockProvider = FutureProvider.family<List<HealthRecord>, Stri
   return repository.getByLivestock(livestockId);
 });
 
+/// Provider for health records by offspring
+final healthByOffspringProvider = FutureProvider.family<List<HealthRecord>, String>((ref, offspringId) async {
+  final repository = ref.watch(healthRepositoryProvider);
+  return repository.getByOffspring(offspringId);
+});
+
 /// Notifier for health record CRUD
 class HealthNotifier extends StateNotifier<AsyncValue<List<HealthRecord>>> {
   final HealthRecordRepository _repository;

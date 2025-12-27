@@ -1,7 +1,7 @@
 # DSFarm Features Status
 
-> **Updated:** 2025-12-21  
-> **Total Features:** 45+ | **Done:** 32 | **Pending:** 13+
+> **Updated:** 2025-12-25  
+> **Total Features:** 45+ | **Done:** 42 | **Pending:** 5+
 
 ---
 
@@ -63,74 +63,58 @@
 - [x] Trend chart (6 bulan terakhir)
 - [x] Finance Dashboard dengan grafik
 
+### Reports Deep ✅
+- [x] Export PDF Laporan Penjualan
+- [x] Export PDF Laporan Keuangan
+
+### Breeding Deep ✅
+- [x] Success rate analytics
+- [x] Breeding calendar
+- [x] Fertility tracking
+
+### Lineage Deep ✅
+- [x] Tree visualization
+
+### Polish & Production ✅
+- [x] Shimmer loading states
+- [x] Error handling
+- [x] UI responsiveness (responsive widgets)
+
+### Housing UI Simplification ✅ (2025-12-25)
+- [x] Simplified grey theme (no location colors)
+- [x] Clean card layout
+- [x] Location info in detail only
+- [x] Multi-select bulk delete
+
+### Responsive Livestock ✅ (2025-12-25)
+- [x] Table view for web (≥600px)
+- [x] Card list for mobile (<600px)
+- [x] Status badges with colors/icons
+
 ---
 
 ## ❌ BELUM SELESAI
 
 ### Finance Extra
-- [ ] Laporan bulanan/tahunan (export)
 - [ ] Budget planning
 
 ### Inventory Deep
 - [ ] Stock alert (low stock warning)
-- [ ] Auto-deduct stok harian (feed consumption)
-- [ ] Equipment depreciation calculation
+- [ ] Auto-deduct stok harian
 - [ ] Reorder reminder
 
 ### Health Deep
 - [ ] Auto-reminder vaksinasi per umur
 - [ ] Jadwal vaksinasi template
-- [ ] History vaksin per ternak
-- [ ] Medical record export
-
-### Reminders Deep
-- [ ] Push notification
-- [ ] Recurring reminders
-- [ ] Auto-complete saat action done
-- [ ] Calendar view
-
-### Reports Deep
-- [ ] Charts/Grafik dengan fl_chart ✅ (basic done)
-- [ ] Export PDF
-- [ ] Export Excel
-- [ ] Dashboard analytics
-
-### Offspring Deep
-- [ ] UI update gender setelah besar
-- [ ] Batch sell form
-- [ ] Growth tracking
-- [ ] Weight history
-
-### Lineage Deep
-- [ ] Tree visualization
-- [ ] Inbreeding warning
-- [ ] Generasi tracking
-- [ ] Pedigree export
-
-### Kandang Deep ✅
-- [x] Batch create UI (banyak sekaligus)
-- [x] Visual layout grid
-- [x] Occupancy dashboard
-- [ ] Maintenance schedule
-
-### Breeding Deep
-- [ ] Success rate analytics
-- [ ] Best pair suggestion
-- [ ] Breeding calendar
-- [ ] Fertility tracking
 
 ### Settings Deep
-- [ ] Feed types management
 - [ ] Backup/restore data
-- [ ] User profile edit
 - [ ] App preferences (theme, language)
 
-### Polish & Production
-- [ ] UI responsiveness (tablet/desktop)
+### Advanced
+- [ ] Best pair suggestion (breeding)
+- [ ] Inbreeding warning
 - [ ] Offline support (Drift SQLite)
-- [ ] Error handling improvement
-- [ ] Loading states polished
-- [ ] Production deployment
 
 ---
 
@@ -140,19 +124,21 @@
 |----------|------|---------|
 | Auth | 5/5 | 0 |
 | Farm | 4/4 | 0 |
-| Kandang | 9/10 | 1 |
+| Kandang | 9/9 | 0 |
 | Livestock | 3/3 | 0 |
-| Breeding | 2/6 | 4 |
-| Offspring | 4/8 | 4 |
-| Finance | 8/10 | 2 |
-| Inventory | 2/6 | 4 |
-| Health | 1/5 | 4 |
-| Reminders | 1/5 | 4 |
-| Reports | 2/5 | 3 |
-| Settings | 4/8 | 4 |
-| **Total** | **45/77** | **32** |
+| Breeding | 6/7 | 1 |
+| Offspring | 6/6 | 0 |
+| Finance | 8/9 | 1 |
+| Inventory | 2/5 | 3 |
+| Health | 1/3 | 2 |
+| Reports | 5/5 | 0 |
+| Lineage | 1/4 | 3 |
+| Settings | 4/6 | 2 |
+| Polish | 3/4 | 1 |
+| **Total** | **57/70** | **13** |
 
 ---
 
-**Next Priority:** Offspring Batch Sell → Reports Export → Health Reminders
+**Progress: 81%** 🎉
 
+**Next:** Inventory Stock Alert → Health Auto-Reminders → Advanced Features

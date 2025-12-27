@@ -4,9 +4,12 @@
 
 library;
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../providers/farm_provider.dart';
 import '../../../providers/livestock_provider.dart';
@@ -16,6 +19,7 @@ import '../../../providers/finance_provider.dart';
 import '../../../models/livestock.dart' show Gender;
 import '../../../models/offspring.dart' show OffspringStatus;
 import '../../../services/pdf_generator.dart';
+import '../../../services/excel_generator.dart';
 
 class ReportsScreen extends ConsumerWidget {
   const ReportsScreen({super.key});
@@ -27,24 +31,65 @@ class ReportsScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Export Laporan',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const Divider(height: 1),
+            
+            // PDF Section
+            const Padding(
+              padding: EdgeInsets.only(left: 16, top: 12, bottom: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('PDF', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+              ),
+            ),
             ListTile(
-              leading: const Icon(Icons.sell, color: Colors.green),
-              title: const Text('Laporan Penjualan'),
-              subtitle: const Text('Export PDF penjualan anakan'),
+              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+              title: const Text('Laporan Penjualan (PDF)'),
               onTap: () {
                 Navigator.pop(context);
                 _exportSalesReport(context, ref);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.account_balance_wallet, color: Colors.blue),
-              title: const Text('Laporan Keuangan'),
-              subtitle: const Text('Export PDF ringkasan keuangan'),
+              leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+              title: const Text('Laporan Keuangan (PDF)'),
               onTap: () {
                 Navigator.pop(context);
                 _exportFinanceReport(context, ref);
               },
             ),
+            
+            // Excel Section
+            const Padding(
+              padding: EdgeInsets.only(left: 16, top: 12, bottom: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('EXCEL', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart, color: Colors.green),
+              title: const Text('Laporan Penjualan (Excel)'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportSalesExcel(context, ref);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart, color: Colors.green),
+              title: const Text('Laporan Keuangan (Excel)'),
+              onTap: () {
+                Navigator.pop(context);
+                _exportFinanceExcel(context, ref);
+              },
+            ),
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -93,6 +138,105 @@ class ReportsScreen extends ConsumerWidget {
     );
 
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
+  Future<void> _exportSalesExcel(BuildContext context, WidgetRef ref) async {
+    final farm = ref.read(currentFarmProvider);
+    if (farm == null) return;
+
+    final offspringsAsync = ref.read(offspringNotifierProvider);
+    final offsprings = offspringsAsync.valueOrNull ?? [];
+    final soldOffsprings = offsprings.where((o) => o.status == OffspringStatus.sold).toList();
+
+    final endDate = DateTime.now();
+    final startDate = endDate.subtract(const Duration(days: 30));
+
+    // Show loading
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Membuat file Excel...')),
+      );
+    }
+
+    try {
+      final bytes = ExcelGenerator.generateSalesReport(
+        farmName: farm.name,
+        soldOffsprings: soldOffsprings,
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      // Save and share file
+      await _shareExcelFile(context, bytes, 'laporan_penjualan_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportFinanceExcel(BuildContext context, WidgetRef ref) async {
+    final farm = ref.read(currentFarmProvider);
+    if (farm == null) return;
+
+    final transAsync = ref.read(financeNotifierProvider);
+    final transactions = transAsync.valueOrNull ?? [];
+    final summaryAsync = ref.read(financeSummaryProvider);
+    final summary = summaryAsync.valueOrNull ?? {'income': 0, 'expense': 0};
+
+    final endDate = DateTime.now();
+    final startDate = endDate.subtract(const Duration(days: 30));
+
+    // Show loading
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Membuat file Excel...')),
+      );
+    }
+
+    try {
+      final bytes = ExcelGenerator.generateFinanceSummary(
+        farmName: farm.name,
+        transactions: transactions,
+        summary: summary,
+        startDate: startDate,
+        endDate: endDate,
+      );
+
+      // Save and share file
+      await _shareExcelFile(context, bytes, 'laporan_keuangan_${DateTime.now().millisecondsSinceEpoch}.xlsx');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareExcelFile(BuildContext context, List<int> bytes, String fileName) async {
+    // Get temp directory
+    final tempDir = await getTemporaryDirectory();
+    final filePath = '${tempDir.path}/$fileName';
+    
+    // Write file
+    final file = File(filePath);
+    await file.writeAsBytes(bytes);
+
+    // Share file
+    await Share.shareXFiles(
+      [XFile(filePath)],
+      text: 'Laporan DSFarm',
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('File Excel berhasil dibuat!')),
+      );
+    }
   }
 
   @override

@@ -3,6 +3,7 @@
 /// Riverpod providers for breeding record state management.
 /// Includes auto-reminder creation and offspring generation.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/breeding_record.dart';
@@ -131,26 +132,32 @@ class BreedingNotifier extends StateNotifier<AsyncValue<List<BreedingRecord>>> {
   /// Update birth and auto-create offspring
   Future<void> updateBirth({
     required String id,
-    required DateTime actualBirthDate,
-    required int birthCount,
+    required DateTime birthDate,
     required int aliveCount,
     int? deadCount,
+    int? maleBorn,
+    int? femaleBorn,
   }) async {
     // Get breeding record first
     final breeding = await _repository.getById(id);
     if (breeding == null || _farmId == null) return;
 
+    final birthCount = aliveCount + (deadCount ?? 0);
+
     // Update breeding record
     await _repository.updateBirth(
       id: id,
-      actualBirthDate: actualBirthDate,
+      actualBirthDate: birthDate,
       birthCount: birthCount,
       aliveCount: aliveCount,
       deadCount: deadCount,
+      maleBorn: maleBorn,
+      femaleBorn: femaleBorn,
     );
 
     // Auto-create offspring for alive count
     if (aliveCount > 0) {
+      debugPrint('Creating $aliveCount offspring for breeding $id');
       try {
         // Get dam and sire info
         final dam = await _livestockRepo.getById(breeding.damId);
@@ -158,23 +165,53 @@ class BreedingNotifier extends StateNotifier<AsyncValue<List<BreedingRecord>>> {
             ? await _livestockRepo.getById(breeding.sireId!)
             : null;
         
-        final damBreedCode = dam?.breedName ?? 'UNK'; // Use breed name as fallback
+        debugPrint('Dam: ${dam?.code}, Sire: ${sire?.code}');
+        
+        // Extract breed code from dam's livestock code (e.g., "NZW-B02" -> "NZW")
+        final damBreedCode = dam?.code.split('-').first ?? 'UNK';
         final sireSeq = sire?.sequenceNumber ?? '00';
         final damSeq = dam?.sequenceNumber ?? '00';
-        final dateStr = _formatDateCode(actualBirthDate);
+        final dateStr = _formatDateCode(birthDate);
 
-        // Create offspring records
-        for (int i = 1; i <= aliveCount; i++) {
-          final code = '$damBreedCode-J$sireSeq.B$damSeq-$dateStr-${i.toString().padLeft(2, '0')}';
+        // Create offspring records with correct gender
+        // First create male offspring, then female
+        int createdCount = 0;
+        
+        // Create male offspring
+        final maleToCreate = maleBorn ?? 0;
+        for (int i = 0; i < maleToCreate; i++) {
+          createdCount++;
+          final code = '$damBreedCode-J$sireSeq.B$damSeq-$dateStr-${createdCount.toString().padLeft(2, '0')}';
+          debugPrint('Creating male offspring with code: $code');
           
           await _offspringRepo.create(
             farmId: _farmId,
             breedingRecordId: id,
             code: code,
-            gender: Gender.unknown, // Will be determined later
-            birthDate: actualBirthDate,
+            gender: Gender.male,
+            birthDate: birthDate,
           );
+          debugPrint('Male offspring $createdCount created successfully');
         }
+        
+        // Create female offspring
+        final femaleToCreate = femaleBorn ?? 0;
+        for (int i = 0; i < femaleToCreate; i++) {
+          createdCount++;
+          final code = '$damBreedCode-J$sireSeq.B$damSeq-$dateStr-${createdCount.toString().padLeft(2, '0')}';
+          debugPrint('Creating female offspring with code: $code');
+          
+          await _offspringRepo.create(
+            farmId: _farmId,
+            breedingRecordId: id,
+            code: code,
+            gender: Gender.female,
+            birthDate: birthDate,
+          );
+          debugPrint('Female offspring $createdCount created successfully');
+        }
+        
+        debugPrint('Total offspring created: $createdCount');
 
         // Create weaning reminder (birth + 35 days)
         await _reminderRepo.create(
@@ -182,12 +219,15 @@ class BreedingNotifier extends StateNotifier<AsyncValue<List<BreedingRecord>>> {
           type: ReminderType.weaning,
           title: 'Sapih anak ${breeding.damCode ?? "Induk"}',
           description: '$aliveCount ekor siap disapih',
-          dueDate: actualBirthDate.add(const Duration(days: 35)),
+          dueDate: birthDate.add(const Duration(days: 35)),
           referenceId: id,
           referenceType: 'breeding_record',
         );
-      } catch (_) {
-        // Ignore offspring creation errors
+        debugPrint('Weaning reminder created');
+      } catch (e, stackTrace) {
+        // Log offspring creation errors for debugging
+        debugPrint('Error creating offspring: $e');
+        debugPrint('Stack trace: $stackTrace');
       }
     }
     
@@ -205,11 +245,15 @@ class BreedingNotifier extends StateNotifier<AsyncValue<List<BreedingRecord>>> {
     required String id,
     required DateTime weaningDate,
     required int weanedCount,
+    int? maleWeaned,
+    int? femaleWeaned,
   }) async {
     await _repository.updateWeaning(
       id: id,
       weaningDate: weaningDate,
       weanedCount: weanedCount,
+      maleWeaned: maleWeaned,
+      femaleWeaned: femaleWeaned,
     );
     await loadBreedings();
   }

@@ -29,6 +29,11 @@
 | Settings Page (Breeds, Categories CRUD) | ✅ |
 | Finance Categories Notifier | ✅ |
 | **Infinite Loading Spinner Bug Fix** | ✅ |
+| Offspring Health Timeline View | ✅ |
+| Auto-Status "Siap Jual" (3+ months) | ✅ |
+| Promotion Offspring to Livestock | ✅ |
+| Accurate Calendar Age Calculation | ✅ |
+| Breeding Age Restriction (4+ months) | ✅ |
 
 ---
 

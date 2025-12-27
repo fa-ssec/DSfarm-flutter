@@ -29,6 +29,12 @@ class Livestock {
   // Computed properties
   final String? housingCode; // Denormalized for display
 
+  // Parent tracking for lineage/inbreeding detection
+  final String? motherId;
+  final String? fatherId;
+  final String? motherCode; // Denormalized for display
+  final String? fatherCode; // Denormalized for display
+
   const Livestock({
     required this.id,
     required this.farmId,
@@ -42,7 +48,7 @@ class Livestock {
     this.acquisitionDate,
     this.acquisitionType = AcquisitionType.purchased,
     this.purchasePrice,
-    this.status = LivestockStatus.active,
+    this.status = LivestockStatus.betinaMuda,
     this.generation = 1,
     this.weight,
     this.notes,
@@ -50,6 +56,10 @@ class Livestock {
     required this.createdAt,
     this.updatedAt,
     this.housingCode,
+    this.motherId,
+    this.fatherId,
+    this.motherCode,
+    this.fatherCode,
   });
 
   /// Display name is just the code
@@ -61,28 +71,74 @@ class Livestock {
     return DateTime.now().difference(birthDate!).inDays;
   }
 
-  /// Age formatted as string
+  /// Age formatted as compact string (e.g., "1th 8bln 10hr")
   String get ageFormatted {
-    final days = ageInDays;
-    if (days == null) return '-';
+    if (birthDate == null) return '-';
     
-    if (days < 30) return '$days hari';
-    if (days < 365) return '${(days / 30).floor()} bulan';
+    final now = DateTime.now();
+    final birth = birthDate!;
     
-    final years = (days / 365).floor();
-    final months = ((days % 365) / 30).floor();
-    if (months == 0) return '$years tahun';
-    return '$years tahun $months bulan';
+    // Calculate years, months, days using calendar logic
+    int years = now.year - birth.year;
+    int months = now.month - birth.month;
+    int days = now.day - birth.day;
+    
+    // Adjust for negative days
+    if (days < 0) {
+      months--;
+      // Get days in previous month
+      final prevMonth = DateTime(now.year, now.month, 0);
+      days += prevMonth.day;
+    }
+    
+    // Adjust for negative months
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    
+    if (years > 0) {
+      if (months > 0) {
+        return '${years}th ${months}bln ${days}hr';
+      }
+      return '${years}th ${days}hr';
+    }
+    if (months > 0) {
+      return '${months}bln ${days}hr';
+    }
+    return '${days}hr';
   }
 
   /// Gender icon
-  String get genderIcon => gender == Gender.male ? '♂️' : '♀️';
+  String get genderIcon => gender == Gender.male ? '♂' : '♀';
 
   /// Check if female (for breeding purposes)
   bool get isFemale => gender == Gender.female;
 
   /// Check if male (for breeding purposes)
   bool get isMale => gender == Gender.male;
+
+  /// Check if livestock is still in farm (not sold/deceased/culled)
+  bool get isInFarm => ![
+    LivestockStatus.sold,
+    LivestockStatus.deceased,
+    LivestockStatus.culled,
+  ].contains(status);
+
+  /// Get farm status display name (shows specific exit reason if not in farm)
+  String get farmStatusDisplay {
+    if (isInFarm) return 'InFarm';
+    switch (status) {
+      case LivestockStatus.sold:
+        return 'Terjual';
+      case LivestockStatus.deceased:
+        return 'Mati';
+      case LivestockStatus.culled:
+        return 'Afkir';
+      default:
+        return 'Keluar';
+    }
+  }
 
   /// Get gender prefix for code (J = Jantan, B = Betina)
   String get genderPrefix => gender == Gender.male ? 'J' : 'B';
@@ -116,7 +172,7 @@ class Livestock {
         json['acquisition_type'] as String? ?? 'purchased',
       ),
       purchasePrice: (json['purchase_price'] as num?)?.toDouble(),
-      status: LivestockStatus.fromString(json['status'] as String? ?? 'active'),
+      status: LivestockStatus.fromString(json['status'] as String? ?? 'betina_muda'),
       generation: json['generation'] as int? ?? 1,
       weight: (json['weight'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
@@ -126,6 +182,10 @@ class Livestock {
           ? DateTime.parse(json['updated_at'] as String) 
           : null,
       housingCode: json['housings']?['code'] as String?,
+      motherId: json['mother_id'] as String?,
+      fatherId: json['father_id'] as String?,
+      motherCode: json['mother']?['code'] as String?,
+      fatherCode: json['father']?['code'] as String?,
     );
   }
 
@@ -147,6 +207,8 @@ class Livestock {
       'weight': weight,
       'notes': notes,
       'metadata': metadata,
+      'mother_id': motherId,
+      'father_id': fatherId,
     };
   }
 
@@ -172,6 +234,10 @@ class Livestock {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? housingCode,
+    String? motherId,
+    String? fatherId,
+    String? motherCode,
+    String? fatherCode,
   }) {
     return Livestock(
       id: id ?? this.id,
@@ -194,6 +260,10 @@ class Livestock {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       housingCode: housingCode ?? this.housingCode,
+      motherId: motherId ?? this.motherId,
+      fatherId: fatherId ?? this.fatherId,
+      motherCode: motherCode ?? this.motherCode,
+      fatherCode: fatherCode ?? this.fatherCode,
     );
   }
 
@@ -203,8 +273,8 @@ class Livestock {
 
 /// Gender enum
 enum Gender {
-  male('male', 'Jantan', '♂️'),
-  female('female', 'Betina', '♀️');
+  male('male', 'Jantan', '♂'),
+  female('female', 'Betina', '♀');
 
   final String value;
   final String displayName;
@@ -239,9 +309,25 @@ enum AcquisitionType {
   }
 }
 
-/// Livestock status enum
+/// Livestock status enum (includes breeding status)
+/// 
+/// Status dibedakan berdasarkan gender:
+/// - Female: betinaMuda, siapKawin, bunting, menyusui, istirahat
+/// - Male: pejantanMuda, pejantanAktif, istirahat
+/// - General: sold, deceased, culled
 enum LivestockStatus {
-  active('active', 'Aktif'),
+  // Female breeding statuses
+  betinaMuda('betina_muda', 'Betina Muda'),
+  siapKawin('siap_kawin', 'Siap Kawin'),
+  bunting('bunting', 'Bunting'),
+  menyusui('menyusui', 'Menyusui'),
+  
+  // Male breeding statuses
+  pejantanMuda('pejantan_muda', 'Pejantan Muda'),
+  pejantanAktif('pejantan_aktif', 'Pejantan Aktif'),
+  
+  // Gender-neutral statuses
+  istirahat('istirahat', 'Istirahat'),
   sold('sold', 'Terjual'),
   deceased('deceased', 'Mati'),
   culled('culled', 'Afkir');
@@ -251,10 +337,69 @@ enum LivestockStatus {
 
   const LivestockStatus(this.value, this.displayName);
 
+  /// Check if this status is valid for female
+  bool get isValidForFemale => 
+      this == betinaMuda || 
+      this == siapKawin || 
+      this == bunting || 
+      this == menyusui || 
+      this == istirahat ||
+      this == sold ||
+      this == deceased ||
+      this == culled;
+
+  /// Check if this status is valid for male
+  bool get isValidForMale => 
+      this == pejantanMuda || 
+      this == pejantanAktif || 
+      this == istirahat ||
+      this == sold ||
+      this == deceased ||
+      this == culled;
+
+  /// Get statuses valid for a specific gender
+  static List<LivestockStatus> forGender(Gender gender) {
+    if (gender == Gender.female) {
+      return [betinaMuda, siapKawin, bunting, menyusui, istirahat, sold, deceased, culled];
+    }
+    return [pejantanMuda, pejantanAktif, istirahat, sold, deceased, culled];
+  }
+
+  /// Get default status for a gender
+  static LivestockStatus defaultFor(Gender gender) {
+    return gender == Gender.female ? betinaMuda : pejantanMuda;
+  }
+
   static LivestockStatus fromString(String value) {
     return LivestockStatus.values.firstWhere(
       (e) => e.value == value,
-      orElse: () => LivestockStatus.active,
+      orElse: () => LivestockStatus.betinaMuda,
     );
   }
+}
+
+/// Statistics class for livestock counts
+class LivestockStats {
+  final int total;      // Total pernah dimiliki
+  final int infarm;     // Masih di farm
+  final int keluar;     // Sudah keluar (sold/deceased/culled)
+  final int maleInfarm;
+  final int femaleInfarm;
+
+  const LivestockStats({
+    required this.total,
+    required this.infarm,
+    required this.keluar,
+    required this.maleInfarm,
+    required this.femaleInfarm,
+  });
+
+  /// Empty stats
+  static const empty = LivestockStats(
+    total: 0,
+    infarm: 0,
+    keluar: 0,
+    maleInfarm: 0,
+    femaleInfarm: 0,
+  );
 }

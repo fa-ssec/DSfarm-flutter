@@ -6,9 +6,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../models/offspring.dart';
 import '../../../providers/offspring_provider.dart';
+import '../widgets/offspring_detail_modal.dart';
 import 'batch_sell_screen.dart';
 
 class OffspringListScreen extends ConsumerStatefulWidget {
@@ -187,132 +189,7 @@ class _OffspringTab extends ConsumerWidget {
   }
 
   void _showDetail(BuildContext context, WidgetRef ref, Offspring offspring) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withAlpha(25),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        offspring.genderIcon,
-                        style: const TextStyle(fontSize: 28),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          offspring.displayName,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Kode: ${offspring.code}',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(offspring.status).withAlpha(25),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      offspring.status.displayName,
-                      style: TextStyle(
-                        color: _getStatusColor(offspring.status),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              _DetailRow(label: 'Umur', value: offspring.ageFormatted),
-              _DetailRow(label: 'Gender', value: offspring.gender.displayName),
-              if (offspring.damCode != null)
-                _DetailRow(label: 'Induk', value: offspring.damCode!),
-              if (offspring.sireCode != null)
-                _DetailRow(label: 'Pejantan', value: offspring.sireCode!),
-              if (offspring.housingCode != null)
-                _DetailRow(label: 'Kandang', value: offspring.housingCode!),
-              if (offspring.weight != null)
-                _DetailRow(label: 'Berat', value: '${offspring.weight} kg'),
-              if (offspring.isWeaned)
-                _DetailRow(label: 'Sapih', value: 'Sudah'),
-              const SizedBox(height: 24),
-              
-              // Quick Actions
-              Wrap(
-                spacing: 8,
-                children: [
-                  if (offspring.status == OffspringStatus.infarm)
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await ref.read(offspringNotifierProvider.notifier)
-                            .updateStatus(offspring.id, OffspringStatus.readySell);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Status diubah ke Siap Jual')),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.sell),
-                      label: const Text('Siap Jual'),
-                    ),
-                  if (offspring.status == OffspringStatus.readySell)
-                    ElevatedButton.icon(
-                      onPressed: () => _showSellDialog(context, ref, offspring),
-                      icon: const Icon(Icons.payments),
-                      label: const Text('Jual'),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    showOffspringDetailModal(context, ref, offspring);
   }
 
   void _showSellDialog(BuildContext context, WidgetRef ref, Offspring offspring) {
@@ -426,7 +303,7 @@ class _OffspringCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            offspring.status.displayName,
+                            offspring.effectiveStatus.displayName,
                             style: TextStyle(
                               fontSize: 10,
                               color: _getStatusColor(),
@@ -452,7 +329,7 @@ class _OffspringCard extends StatelessWidget {
   }
 
   Color _getStatusColor() {
-    switch (offspring.status) {
+    switch (offspring.effectiveStatus) {
       case OffspringStatus.infarm:
         return Colors.blue;
       case OffspringStatus.weaned:

@@ -163,6 +163,34 @@ class OffspringRepository {
         .eq('id', id);
   }
 
+  /// Promote offspring to livestock (creates new livestock, updates offspring status)
+  Future<void> promoteToLivestock(String offspringId) async {
+    // 1. Get offspring data
+    final offspring = await getById(offspringId);
+    if (offspring == null) throw Exception('Offspring not found');
+    
+    // 2. Create livestock record with offspring data
+    await SupabaseService.client
+        .from('livestocks')
+        .insert({
+          'farm_id': offspring.farmId,
+          'code': offspring.code,
+          'name': offspring.name,
+          'gender': offspring.gender == Gender.female,  // isFemale
+          'birth_date': offspring.birthDate.toIso8601String().split('T').first,
+          'breed_id': offspring.breedId,
+          'housing_id': offspring.housingId,
+          'status': 'active',
+          'acquisition_type': 'internal',  // Promoted from offspring
+          'generation': 1,
+          'weight': offspring.weight,
+          'notes': 'Dipromosikan dari anakan ${offspring.code}',
+        });
+    
+    // 3. Update offspring status to promoted
+    await updateStatus(offspringId, OffspringStatus.promoted);
+  }
+
   /// Delete offspring
   Future<void> delete(String id) async {
     await SupabaseService.client

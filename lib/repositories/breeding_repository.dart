@@ -147,6 +147,8 @@ class BreedingRecordRepository {
     required int birthCount,
     required int aliveCount,
     int? deadCount,
+    int? maleBorn,
+    int? femaleBorn,
   }) async {
     final response = await SupabaseService.client
         .from(_tableName)
@@ -155,6 +157,8 @@ class BreedingRecordRepository {
           'birth_count': birthCount,
           'alive_count': aliveCount,
           'dead_count': deadCount ?? (birthCount - aliveCount),
+          'male_born': maleBorn,
+          'female_born': femaleBorn,
           'status': 'birthed',
           'updated_at': DateTime.now().toIso8601String(),
         })
@@ -174,12 +178,16 @@ class BreedingRecordRepository {
     required String id,
     required DateTime weaningDate,
     required int weanedCount,
+    int? maleWeaned,
+    int? femaleWeaned,
   }) async {
     final response = await SupabaseService.client
         .from(_tableName)
         .update({
           'weaning_date': weaningDate.toIso8601String().split('T').first,
           'weaned_count': weanedCount,
+          'male_weaned': maleWeaned,
+          'female_weaned': femaleWeaned,
           'status': 'weaned',
           'updated_at': DateTime.now().toIso8601String(),
         })

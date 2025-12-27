@@ -191,11 +191,11 @@ class _CreateHousingScreenState extends ConsumerState<CreateHousingScreen> {
                       controller: _levelController,
                       inputFormatters: [
                         _UpperCaseLettersFormatter(),
-                        LengthLimitingTextInputFormatter(5),
+                        LengthLimitingTextInputFormatter(8),
                       ],
                       decoration: const InputDecoration(
                         labelText: 'Lokasi',
-                        hintText: 'A, T, B (maks 5)',
+                        hintText: 'LUAR, DALAM, dsb',
                       ),
                     ),
                   ),

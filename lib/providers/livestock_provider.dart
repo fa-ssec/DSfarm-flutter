@@ -49,6 +49,15 @@ final livestockCountProvider = FutureProvider<Map<Gender, int>>((ref) async {
   return repository.getCountByGender(farm.id);
 });
 
+/// Provider for full livestock statistics (total, infarm, keluar)
+final livestockStatsProvider = FutureProvider<LivestockStats>((ref) async {
+  final farm = ref.watch(currentFarmProvider);
+  if (farm == null) return LivestockStats.empty;
+  
+  final repository = ref.watch(livestockRepositoryProvider);
+  return repository.getFullStats(farm.id);
+});
+
 /// Notifier for livestock CRUD operations
 class LivestockNotifier extends StateNotifier<AsyncValue<List<Livestock>>> {
   final LivestockRepository _repository;
@@ -84,9 +93,12 @@ class LivestockNotifier extends StateNotifier<AsyncValue<List<Livestock>>> {
     DateTime? acquisitionDate,
     AcquisitionType acquisitionType = AcquisitionType.purchased,
     double? purchasePrice,
+    LivestockStatus? status,
     int generation = 1,
     double? weight,
     String? notes,
+    String? motherId,
+    String? fatherId,
   }) async {
     if (_farmId == null) throw Exception('No farm selected');
     
@@ -101,9 +113,12 @@ class LivestockNotifier extends StateNotifier<AsyncValue<List<Livestock>>> {
       acquisitionDate: acquisitionDate,
       acquisitionType: acquisitionType,
       purchasePrice: purchasePrice,
+      status: status ?? LivestockStatus.defaultFor(gender),
       generation: generation,
       weight: weight,
       notes: notes,
+      motherId: motherId,
+      fatherId: fatherId,
     );
     
     await loadLivestocks();

@@ -12,6 +12,7 @@ import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/farm_selector/screens/farm_list_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
+import 'features/lineage/screens/lineage_screen.dart';
 
 /// Router provider for dependency injection
 final routerProvider = Provider<GoRouter>((ref) {
@@ -72,12 +73,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // TODO: Add more routes as we build features
-      // - /livestock/:farmId
-      // - /offspring/:farmId
-      // - /breeding/:farmId
-      // - /finance/:farmId
-      // - /settings
+      // ═══════════════════════════════════════════════════════════
+      // LINEAGE ROUTE
+      // ═══════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/lineage',
+        name: 'lineage',
+        builder: (context, state) {
+          final offspringId = state.uri.queryParameters['offspringId'];
+          final livestockId = state.uri.queryParameters['livestockId'];
+          return LineageScreen(
+            offspringId: offspringId,
+            livestockId: livestockId,
+          );
+        },
+      ),
     ],
   );
 });

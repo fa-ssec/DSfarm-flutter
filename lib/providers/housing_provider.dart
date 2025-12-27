@@ -108,6 +108,8 @@ class HousingNotifier extends StateNotifier<AsyncValue<List<Housing>>> {
   }
 
   /// Create multiple housings with same settings
+  /// Code format: BLOK-NN (e.g., A-01, A-02)
+  /// Fills gaps in numbering per block
   Future<void> createBatch({
     required String blockCode,
     required int count,
@@ -117,25 +119,46 @@ class HousingNotifier extends StateNotifier<AsyncValue<List<Housing>>> {
   }) async {
     if (_farmId == null) throw Exception('No farm selected');
     
-    // Get next starting number for this block
+    final block = blockCode.toUpperCase();
+    final codePrefix = '$block-';
+    
+    // Get existing housings in this block
     final existingHousings = state.valueOrNull ?? [];
     final blockHousings = existingHousings.where(
-      (h) => h.code.toUpperCase().startsWith('${blockCode.toUpperCase()}-')
+      (h) => h.code.toUpperCase().startsWith(codePrefix)
     ).toList();
     
-    int startNum = 1;
+    // Extract used numbers
+    final usedNumbers = <int>{};
     for (final h in blockHousings) {
       final parts = h.code.split('-');
       if (parts.length >= 2) {
-        final num = int.tryParse(parts.last) ?? 0;
-        if (num >= startNum) startNum = num + 1;
+        final num = int.tryParse(parts.last);
+        if (num != null) usedNumbers.add(num);
       }
     }
     
-    // Create housings in batch
+    // Find available numbers (gaps first, then new numbers)
+    final availableNumbers = <int>[];
+    int maxNumber = usedNumbers.isEmpty ? 0 : usedNumbers.reduce((a, b) => a > b ? a : b);
+    
+    // First, fill gaps
+    for (int i = 1; i <= maxNumber && availableNumbers.length < count; i++) {
+      if (!usedNumbers.contains(i)) {
+        availableNumbers.add(i);
+      }
+    }
+    
+    // Then, add new sequential numbers
+    int nextNum = maxNumber + 1;
+    while (availableNumbers.length < count) {
+      availableNumbers.add(nextNum++);
+    }
+    
+    // Create housings
     for (int i = 0; i < count; i++) {
-      final num = startNum + i;
-      final code = '${blockCode.toUpperCase()}-${num.toString().padLeft(2, '0')}';
+      final num = availableNumbers[i];
+      final code = '$codePrefix${num.toString().padLeft(2, '0')}';
       
       await _repository.create(
         farmId: _farmId,
@@ -148,6 +171,14 @@ class HousingNotifier extends StateNotifier<AsyncValue<List<Housing>>> {
       );
     }
     
+    await loadHousings();
+  }
+
+  /// Delete multiple housings at once
+  Future<void> deleteBatch(List<String> ids) async {
+    for (final id in ids) {
+      await _repository.delete(id);
+    }
     await loadHousings();
   }
 }

@@ -62,11 +62,37 @@ class Offspring {
 
   /// Age formatted as string
   String get ageFormatted {
-    final days = ageInDays;
-    if (days < 7) return '$days hari';
-    if (days < 30) return '${(days / 7).floor()} minggu';
-    if (days < 365) return '${(days / 30).floor()} bulan';
-    return '${(days / 365).floor()} tahun';
+    final now = DateTime.now();
+    final birth = birthDate;
+    
+    // Calculate years, months, days using calendar logic
+    int years = now.year - birth.year;
+    int months = now.month - birth.month;
+    int days = now.day - birth.day;
+    
+    // Adjust for negative days
+    if (days < 0) {
+      months--;
+      final prevMonth = DateTime(now.year, now.month, 0);
+      days += prevMonth.day;
+    }
+    
+    // Adjust for negative months
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    
+    if (years > 0) {
+      if (months > 0) {
+        return '${years}th ${months}bln ${days}hr';
+      }
+      return '${years}th ${days}hr';
+    }
+    if (months > 0) {
+      return '${months}bln ${days}hr';
+    }
+    return '${days} hari';
   }
 
   /// Gender icon
@@ -74,6 +100,26 @@ class Offspring {
 
   /// Check if weaned
   bool get isWeaned => weaningDate != null;
+
+  /// Effective status - auto-calculates "siap jual" if 3+ months old
+  /// This does not change the database value, just the displayed status
+  OffspringStatus get effectiveStatus {
+    // If already sold, deceased, or promoted - keep that status
+    if (status == OffspringStatus.sold || 
+        status == OffspringStatus.deceased ||
+        status == OffspringStatus.promoted) {
+      return status;
+    }
+    
+    // If 3+ months old (90 days) and still infarm/weaned, show as ready to sell
+    if (ageInDays >= 90 && 
+        (status == OffspringStatus.infarm || 
+         status == OffspringStatus.weaned)) {
+      return OffspringStatus.readySell;
+    }
+    
+    return status;
+  }
 
   /// Create from JSON (Supabase response)
   factory Offspring.fromJson(Map<String, dynamic> json) {

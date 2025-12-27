@@ -12,23 +12,114 @@ import '../../../providers/housing_provider.dart';
 import '../../../providers/livestock_provider.dart';
 import 'create_housing_screen.dart';
 
-class HousingListScreen extends ConsumerWidget {
+class HousingListScreen extends ConsumerStatefulWidget {
   const HousingListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HousingListScreen> createState() => _HousingListScreenState();
+}
+
+class _HousingListScreenState extends ConsumerState<HousingListScreen> {
+  bool _isSelectMode = false;
+  final Set<String> _selectedIds = {};
+
+  void _toggleSelectMode() {
+    setState(() {
+      _isSelectMode = !_isSelectMode;
+      if (!_isSelectMode) _selectedIds.clear();
+    });
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _selectAll(List<Housing> housings) {
+    setState(() {
+      if (_selectedIds.length == housings.length) {
+        _selectedIds.clear();
+      } else {
+        _selectedIds.addAll(housings.map((h) => h.id));
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Kandang?'),
+        content: Text('Hapus ${_selectedIds.length} kandang yang dipilih?\n\nTernak di kandang tersebut akan dipindahkan ke status "Tidak ada kandang".'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ref.read(housingNotifierProvider.notifier).deleteBatch(_selectedIds.toList());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${_selectedIds.length} kandang berhasil dihapus')),
+        );
+        _toggleSelectMode();
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final housingsAsync = ref.watch(housingNotifierProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Kandang')),
+      appBar: AppBar(
+        title: _isSelectMode 
+            ? Text('${_selectedIds.length} dipilih')
+            : const Text('Kandang'),
+        actions: [
+          if (_isSelectMode) ...[
+            IconButton(
+              icon: const Icon(Icons.select_all),
+              tooltip: 'Pilih Semua',
+              onPressed: () => housingsAsync.whenData((h) => _selectAll(h)),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              tooltip: 'Hapus',
+              onPressed: _selectedIds.isNotEmpty ? _deleteSelected : null,
+            ),
+          ],
+          IconButton(
+            icon: Icon(_isSelectMode ? Icons.close : Icons.checklist),
+            tooltip: _isSelectMode ? 'Batal' : 'Pilih',
+            onPressed: _toggleSelectMode,
+          ),
+        ],
+      ),
       body: housingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Error: $error')),
         data: (housings) => housings.isEmpty
             ? _buildEmptyState(context)
-            : _buildGridView(context, ref, housings),
+            : _buildGridView(context, housings),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _isSelectMode ? null : FloatingActionButton(
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const CreateHousingScreen()),
@@ -53,22 +144,13 @@ class HousingListScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildGridView(BuildContext context, WidgetRef ref, List<Housing> housings) {
+  Widget _buildGridView(BuildContext context, List<Housing> housings) {
     // Group by block (from code prefix, e.g., "AA-01" -> "AA")
     final grouped = <String, List<Housing>>{};
     for (final h in housings) {
       final parts = h.code.split('-');
       final block = parts.length >= 2 ? parts.first : 'Lainnya';
       grouped.putIfAbsent(block, () => []).add(h);
-    }
-
-    // Get levels per block
-    Map<String, Set<String>> blockLevels = {};
-    for (final entry in grouped.entries) {
-      blockLevels[entry.key] = entry.value
-          .where((h) => h.level != null && h.level!.isNotEmpty)
-          .map((h) => h.level!)
-          .toSet();
     }
 
     return RefreshIndicator(
@@ -79,22 +161,30 @@ class HousingListScreen extends ConsumerWidget {
         itemBuilder: (context, index) {
           final block = grouped.keys.elementAt(index);
           final items = grouped[block]!..sort((a, b) => a.code.compareTo(b.code));
-          final levels = blockLevels[block] ?? {};
           final available = items.where((h) => (h.currentOccupancy ?? 0) < h.capacity).length;
 
           return _BlockSection(
             block: block,
             housings: items,
-            levels: levels.toList(),
             availableCount: available,
-            onHousingTap: (h) => _showHousingDetail(context, ref, h),
+            isSelectMode: _isSelectMode,
+            selectedIds: _selectedIds,
+            onHousingTap: (h) => _isSelectMode 
+                ? _toggleSelection(h.id)
+                : _showHousingDetail(context, h),
+            onLongPress: (h) {
+              if (!_isSelectMode) {
+                _toggleSelectMode();
+                _toggleSelection(h.id);
+              }
+            },
           );
         },
       ),
     );
   }
 
-  void _showHousingDetail(BuildContext context, WidgetRef ref, Housing housing) {
+  void _showHousingDetail(BuildContext context, Housing housing) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -108,26 +198,21 @@ class HousingListScreen extends ConsumerWidget {
 class _BlockSection extends StatelessWidget {
   final String block;
   final List<Housing> housings;
-  final List<String> levels;
   final int availableCount;
   final Function(Housing) onHousingTap;
+  final bool isSelectMode;
+  final Set<String> selectedIds;
+  final Function(Housing)? onLongPress;
 
   const _BlockSection({
     required this.block,
     required this.housings,
-    required this.levels,
     required this.availableCount,
     required this.onHousingTap,
+    this.isSelectMode = false,
+    this.selectedIds = const {},
+    this.onLongPress,
   });
-
-  Color _levelColor(String level) {
-    switch (level.toLowerCase()) {
-      case 'bawah': return Colors.green;
-      case 'tengah': return Colors.orange;
-      case 'atas': return Colors.blue;
-      default: return Colors.grey;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,29 +236,9 @@ class _BlockSection extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Blok $block',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                      if (levels.isNotEmpty)
-                        Wrap(
-                          spacing: 4,
-                          children: levels.map((l) => Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _levelColor(l).withAlpha(30),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              l,
-                              style: TextStyle(fontSize: 10, color: _levelColor(l)),
-                            ),
-                          )).toList(),
-                        ),
-                    ],
+                  child: Text(
+                    'Blok $block',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
                 Column(
@@ -200,7 +265,10 @@ class _BlockSection extends StatelessWidget {
               runSpacing: 8,
               children: housings.map((h) => _HousingCard(
                 housing: h,
+                isSelected: selectedIds.contains(h.id),
+                isSelectMode: isSelectMode,
                 onTap: () => onHousingTap(h),
+                onLongPress: onLongPress != null ? () => onLongPress!(h) : null,
               )).toList(),
             ),
           ],
@@ -213,70 +281,75 @@ class _BlockSection extends StatelessWidget {
 class _HousingCard extends StatelessWidget {
   final Housing housing;
   final VoidCallback onTap;
+  final bool isSelected;
+  final bool isSelectMode;
+  final VoidCallback? onLongPress;
 
-  const _HousingCard({required this.housing, required this.onTap});
-
-  /// Get color based on level (location)
-  Color _getLevelColor() {
-    final level = housing.level?.toUpperCase() ?? '';
-    if (level.startsWith('A')) return Colors.blue;
-    if (level.startsWith('T')) return Colors.orange;
-    if (level.startsWith('B')) return Colors.green;
-    return Colors.grey; // default no level
-  }
+  const _HousingCard({
+    required this.housing, 
+    required this.onTap,
+    this.isSelected = false,
+    this.isSelectMode = false,
+    this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final occupancy = housing.currentOccupancy ?? 0;
-    final isFull = occupancy >= housing.capacity;
-    final levelColor = _getLevelColor();
-    final occupancyColor = isFull ? Colors.purple : Colors.green;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        width: 72,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: levelColor.withAlpha(15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: levelColor.withAlpha(60), width: 1.5),
-        ),
-        child: Column(
-          children: [
-            // Dot indicator (occupancy)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(Icons.home, size: 16, color: levelColor),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: occupancyColor,
-                    shape: BoxShape.circle,
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 72,
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.blue.withAlpha(30) : Colors.grey[800],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? Colors.blue : Colors.grey[600]!, 
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Icon(Icons.home, size: 16, color: Colors.grey[400]),
+                    const SizedBox(height: 2),
+                    Text(
+                      housing.code,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[300],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Positioned(
+                  top: -6,
+                  right: -6,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.check, size: 8, color: Colors.white),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            // Code
-            Text(
-              housing.code,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: levelColor.withAlpha(200),
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-            // Occupancy
-            Text(
-              '$occupancy/${housing.capacity}',
-              style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -288,22 +361,6 @@ class _HousingDetailSheet extends ConsumerWidget {
 
   const _HousingDetailSheet({required this.housing});
 
-  Color _getLevelColor() {
-    final level = housing.level?.toUpperCase() ?? '';
-    if (level.startsWith('A')) return Colors.blue;
-    if (level.startsWith('T')) return Colors.orange;
-    if (level.startsWith('B')) return Colors.green;
-    return Colors.grey;
-  }
-
-  String _getLevelName() {
-    final level = housing.level?.toUpperCase() ?? '';
-    if (level.startsWith('A')) return 'Atas';
-    if (level.startsWith('T')) return 'Tengah';
-    if (level.startsWith('B')) return 'Bawah';
-    return housing.level ?? 'Tidak ada';
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Get livestock in this housing
@@ -311,7 +368,6 @@ class _HousingDetailSheet extends ConsumerWidget {
     final occupants = livestockAsync.valueOrNull
         ?.where((l) => l.housingId == housing.id)
         .toList() ?? [];
-    final levelColor = _getLevelColor();
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -319,17 +375,17 @@ class _HousingDetailSheet extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with level color
+          // Header - grey theme
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: levelColor.withAlpha(25),
+                  color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: levelColor.withAlpha(80)),
+                  border: Border.all(color: Colors.grey[600]!),
                 ),
-                child: Icon(Icons.home_work, color: levelColor),
+                child: Icon(Icons.home_work, color: Colors.grey[400]),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -341,38 +397,41 @@ class _HousingDetailSheet extends ConsumerWidget {
                   ],
                 ),
               ),
+              // Delete button
+              IconButton(
+                icon: Icon(Icons.delete_outline, color: Colors.red[400]),
+                onPressed: () => _showDeleteConfirmation(context, ref),
+              ),
             ],
           ),
           const SizedBox(height: 16),
 
-          // Location info row
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: levelColor.withAlpha(15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.location_on, size: 18, color: levelColor),
-                const SizedBox(width: 8),
-                Text('Lokasi: ', style: TextStyle(color: Colors.grey[600])),
-                Text(
-                  _getLevelName(),
-                  style: TextStyle(fontWeight: FontWeight.bold, color: levelColor),
-                ),
-                if (housing.level != null && housing.level!.length > 1) ...[
-                  Text(' (${housing.level})', style: TextStyle(color: Colors.grey[500])),
+          // Location info row - grey theme
+          if (housing.level != null && housing.level!.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[850],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on, size: 18, color: Colors.grey[400]),
+                  const SizedBox(width: 8),
+                  Text('Lokasi: ', style: TextStyle(color: Colors.grey[500])),
+                  Text(
+                    housing.level!,
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[300]),
+                  ),
                 ],
-              ],
+              ),
             ),
-          ),
           const SizedBox(height: 16),
           
           // Occupants
           Text(
             'Ternak di Kandang Ini:',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[700]),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[400]),
           ),
           const SizedBox(height: 8),
           if (occupants.isEmpty)
@@ -389,6 +448,41 @@ class _HousingDetailSheet extends ConsumerWidget {
               trailing: Text(l.status.displayName),
             )),
           const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Kandang?'),
+        content: Text(
+          'Apakah yakin ingin menghapus kandang ${housing.code}?\n\n'
+          'Ternak di dalam kandang ini akan dipindahkan ke status "Tidak ada kandang".',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Close bottom sheet
+              
+              await ref.read(housingNotifierProvider.notifier).delete(housing.id);
+              
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Kandang ${housing.code} berhasil dihapus')),
+                );
+              }
+            },
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
     );

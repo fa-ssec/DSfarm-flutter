@@ -18,8 +18,12 @@ class BreedingRecord {
   final int? birthCount;      // Total born
   final int? aliveCount;      // Born alive
   final int? deadCount;       // Born dead
+  final int? maleBorn;        // Male born alive
+  final int? femaleBorn;      // Female born alive
   final DateTime? weaningDate;
   final int? weanedCount;
+  final int? maleWeaned;      // Male weaned
+  final int? femaleWeaned;    // Female weaned
   final BreedingStatus status;
   final String? notes;
   final DateTime createdAt;
@@ -44,8 +48,12 @@ class BreedingRecord {
     this.birthCount,
     this.aliveCount,
     this.deadCount,
+    this.maleBorn,
+    this.femaleBorn,
     this.weaningDate,
     this.weanedCount,
+    this.maleWeaned,
+    this.femaleWeaned,
     this.status = BreedingStatus.mated,
     this.notes,
     required this.createdAt,
@@ -100,10 +108,14 @@ class BreedingRecord {
       birthCount: json['birth_count'] as int?,
       aliveCount: json['alive_count'] as int?,
       deadCount: json['dead_count'] as int?,
+      maleBorn: json['male_born'] as int?,
+      femaleBorn: json['female_born'] as int?,
       weaningDate: json['weaning_date'] != null 
           ? DateTime.parse(json['weaning_date'] as String) 
           : null,
       weanedCount: json['weaned_count'] as int?,
+      maleWeaned: json['male_weaned'] as int?,
+      femaleWeaned: json['female_weaned'] as int?,
       status: BreedingStatus.fromString(json['status'] as String? ?? 'mated'),
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -131,8 +143,12 @@ class BreedingRecord {
       'birth_count': birthCount,
       'alive_count': aliveCount,
       'dead_count': deadCount,
+      'male_born': maleBorn,
+      'female_born': femaleBorn,
       'weaning_date': weaningDate?.toIso8601String().split('T').first,
       'weaned_count': weanedCount,
+      'male_weaned': maleWeaned,
+      'female_weaned': femaleWeaned,
       'status': status.value,
       'notes': notes,
     };
@@ -152,8 +168,12 @@ class BreedingRecord {
     int? birthCount,
     int? aliveCount,
     int? deadCount,
+    int? maleBorn,
+    int? femaleBorn,
     DateTime? weaningDate,
     int? weanedCount,
+    int? maleWeaned,
+    int? femaleWeaned,
     BreedingStatus? status,
     String? notes,
     DateTime? createdAt,
@@ -176,8 +196,12 @@ class BreedingRecord {
       birthCount: birthCount ?? this.birthCount,
       aliveCount: aliveCount ?? this.aliveCount,
       deadCount: deadCount ?? this.deadCount,
+      maleBorn: maleBorn ?? this.maleBorn,
+      femaleBorn: femaleBorn ?? this.femaleBorn,
       weaningDate: weaningDate ?? this.weaningDate,
       weanedCount: weanedCount ?? this.weanedCount,
+      maleWeaned: maleWeaned ?? this.maleWeaned,
+      femaleWeaned: femaleWeaned ?? this.femaleWeaned,
       status: status ?? this.status,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,

@@ -14,6 +14,7 @@ import '../../../providers/livestock_provider.dart';
 import '../../../providers/housing_provider.dart';
 import '../../../providers/breed_provider.dart';
 import '../../../providers/farm_provider.dart';
+import '../../../providers/weight_record_provider.dart';
 
 class CreateLivestockScreen extends ConsumerStatefulWidget {
   const CreateLivestockScreen({super.key});
@@ -29,6 +30,7 @@ class _CreateLivestockScreenState extends ConsumerState<CreateLivestockScreen> {
   final _notesController = TextEditingController();
   
   Gender _selectedGender = Gender.female;
+  LivestockStatus _selectedStatus = LivestockStatus.betinaMuda;
   AcquisitionType _selectedAcquisition = AcquisitionType.purchased;
   String? _selectedHousingId;
   String? _selectedBreedId;
@@ -106,7 +108,11 @@ class _CreateLivestockScreenState extends ConsumerState<CreateLivestockScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(livestockNotifierProvider.notifier).create(
+      final weight = _weightController.text.isEmpty 
+          ? null 
+          : double.tryParse(_weightController.text);
+      
+      final livestock = await ref.read(livestockNotifierProvider.notifier).create(
         code: _generatedCode,
         gender: _selectedGender,
         housingId: _selectedHousingId,
@@ -117,13 +123,29 @@ class _CreateLivestockScreenState extends ConsumerState<CreateLivestockScreen> {
         purchasePrice: _priceController.text.isEmpty 
             ? null 
             : double.tryParse(_priceController.text),
-        weight: _weightController.text.isEmpty 
-            ? null 
-            : double.tryParse(_weightController.text),
+        status: _selectedStatus,
+        weight: weight,
         notes: _notesController.text.trim().isEmpty 
             ? null 
             : _notesController.text.trim(),
       );
+
+      // If weight was provided, also create a weight record
+      if (weight != null) {
+        final recordedAt = _acquisitionDate ?? DateTime.now();
+        int? ageDays;
+        if (_birthDate != null) {
+          ageDays = recordedAt.difference(_birthDate!).inDays;
+        }
+        
+        await ref.read(weightRecordRepositoryProvider).create(
+          livestockId: livestock.id,
+          weight: weight,
+          ageDays: ageDays,
+          recordedAt: recordedAt,
+          notes: 'Berat awal saat registrasi',
+        );
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -228,7 +250,10 @@ class _CreateLivestockScreenState extends ConsumerState<CreateLivestockScreen> {
                       gender: Gender.female,
                       isSelected: _selectedGender == Gender.female,
                       onTap: () {
-                        setState(() => _selectedGender = Gender.female);
+                        setState(() {
+                          _selectedGender = Gender.female;
+                          _selectedStatus = LivestockStatus.betinaMuda;
+                        });
                         _updateGeneratedCode();
                       },
                     ),
@@ -239,12 +264,36 @@ class _CreateLivestockScreenState extends ConsumerState<CreateLivestockScreen> {
                       gender: Gender.male,
                       isSelected: _selectedGender == Gender.male,
                       onTap: () {
-                        setState(() => _selectedGender = Gender.male);
+                        setState(() {
+                          _selectedGender = Gender.male;
+                          _selectedStatus = LivestockStatus.pejantanMuda;
+                        });
                         _updateGeneratedCode();
                       },
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+
+              // Status Selection (filtered by gender)
+              DropdownButtonFormField<LivestockStatus>(
+                value: _selectedStatus,
+                decoration: const InputDecoration(
+                  labelText: 'Status',
+                  prefixIcon: Icon(Icons.info_outline),
+                ),
+                items: LivestockStatus.forGender(_selectedGender)
+                    .map((status) => DropdownMenuItem(
+                          value: status,
+                          child: Text(status.displayName),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedStatus = value);
+                  }
+                },
               ),
               const SizedBox(height: 24),
 
