@@ -171,7 +171,7 @@ class MonthlyTrendData {
   double get balance => income - expense;
 }
 
-/// Provider for monthly trend (last 6 months)
+/// Provider for monthly trend (last 12 months)
 final monthlyTrendProvider = FutureProvider<List<MonthlyTrendData>>((ref) async {
   final farm = ref.watch(currentFarmProvider);
   if (farm == null) return [];
@@ -180,8 +180,8 @@ final monthlyTrendProvider = FutureProvider<List<MonthlyTrendData>>((ref) async 
   final now = DateTime.now();
   final List<MonthlyTrendData> result = [];
   
-  // Get data for last 6 months
-  for (int i = 5; i >= 0; i--) {
+  // Get data for last 12 months
+  for (int i = 11; i >= 0; i--) {
     final monthStart = DateTime(now.year, now.month - i, 1);
     final monthEnd = DateTime(now.year, now.month - i + 1, 0);
     

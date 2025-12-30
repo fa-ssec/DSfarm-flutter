@@ -509,6 +509,11 @@ class _InformasiTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Watch weight records to get latest weight
+    final weightRecordsAsync = ref.watch(offspringWeightRecordNotifierProvider(offspring.id));
+    // Watch health records to get health status
+    final healthRecordsAsync = ref.watch(healthByOffspringProvider(offspring.id));
+    
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -526,7 +531,27 @@ class _InformasiTab extends ConsumerWidget {
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   const SizedBox(height: 12),
-                  _InfoRow(label: 'Kesehatan', value: 'Sehat'),
+                  // Get health status from health_records
+                  healthRecordsAsync.when(
+                    loading: () => const _InfoRow(label: 'Kesehatan', value: '...'),
+                    error: (_, __) => const _InfoRow(label: 'Kesehatan', value: 'Sehat'),
+                    data: (records) {
+                      if (records.isNotEmpty) {
+                        // Check if there are active illness records (within last 30 days)
+                        final recentIllness = records.where((r) => 
+                          r.type == HealthRecordType.illness &&
+                          DateTime.now().difference(r.recordDate).inDays <= 30
+                        ).toList();
+                        if (recentIllness.isNotEmpty) {
+                          return _InfoRow(
+                            label: 'Kesehatan', 
+                            value: '⚠️ ${recentIllness.first.title}',
+                          );
+                        }
+                      }
+                      return const _InfoRow(label: 'Kesehatan', value: 'Sehat');
+                    },
+                  ),
                   if (offspring.name != null)
                     _InfoRow(label: 'Nama', value: offspring.name!),
                   _InfoRow(label: 'Jenis Kelamin', value: offspring.gender.displayName),
@@ -534,9 +559,32 @@ class _InformasiTab extends ConsumerWidget {
                   _InfoRow(label: 'Umur', value: offspring.ageFormatted),
                   if (offspring.weaningDate != null)
                     _InfoRow(label: 'Sapih', value: _formatDate(offspring.weaningDate)),
-                  _InfoRow(label: 'Berat', value: offspring.weight != null 
-                      ? '${offspring.weight?.toStringAsFixed(2)} kg' 
-                      : '-'),
+                  // Get latest weight from weight_records
+                  weightRecordsAsync.when(
+                    loading: () => const _InfoRow(label: 'Berat', value: '...'),
+                    error: (_, __) => _InfoRow(
+                      label: 'Berat', 
+                      value: offspring.weight != null 
+                          ? '${offspring.weight?.toStringAsFixed(2)} kg' 
+                          : '-',
+                    ),
+                    data: (records) {
+                      if (records.isNotEmpty) {
+                        // Records are sorted descending, first is latest
+                        final latestWeight = records.first.weight;
+                        return _InfoRow(
+                          label: 'Berat', 
+                          value: '${latestWeight.toStringAsFixed(2)} kg',
+                        );
+                      }
+                      return _InfoRow(
+                        label: 'Berat', 
+                        value: offspring.weight != null 
+                            ? '${offspring.weight?.toStringAsFixed(2)} kg' 
+                            : '-',
+                      );
+                    },
+                  ),
                   _InfoRow(label: 'Kandang', value: offspring.housingCode ?? '-'),
                 ],
               ),
@@ -654,79 +702,523 @@ class _PertumbuhanTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // For now, show empty state since weight records are tied to livestock, not offspring
-    // TODO: Add weight tracking for offspring
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Current weight card
-          if (offspring.weight != null)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withAlpha(25),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.monitor_weight, color: Colors.blue),
+    final recordsAsync = ref.watch(offspringWeightRecordNotifierProvider(offspring.id));
+
+    return recordsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (records) {
+        if (records.isEmpty) {
+          return _buildEmptyState(context, ref);
+        }
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Chart
+              _buildChart(records),
+              const SizedBox(height: 16),
+              // Add button
+              _buildAddButton(context, ref),
+              const SizedBox(height: 16),
+              // Log list
+              _buildLogList(context, ref, records),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.show_chart, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Belum Ada Data Berat',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tambahkan data berat untuk melihat grafik pertumbuhan.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => _showAddWeightDialog(context, ref),
+              icon: const Icon(Icons.add),
+              label: const Text('Tambah Data Berat'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4CAF50),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChart(List<WeightRecord> records) {
+    // Sort by date ascending for chart
+    final sortedRecords = List<WeightRecord>.from(records)
+      ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
+
+    if (sortedRecords.length < 2) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text(
+                'Berat Saat Ini',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${sortedRecords.first.weight} kg',
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4CAF50),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tambahkan lebih banyak data untuk melihat grafik',
+                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Build line chart data
+    final spots = sortedRecords.asMap().entries.map((e) {
+      return FlSpot(e.key.toDouble(), e.value.weight);
+    }).toList();
+
+    final minWeight = sortedRecords.map((r) => r.weight).reduce((a, b) => a < b ? a : b);
+    final maxWeight = sortedRecords.map((r) => r.weight).reduce((a, b) => a > b ? a : b);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Grafik Pertumbuhan Berat',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: maxWeight == minWeight ? 1 : (maxWeight - minWeight) / 4,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.grey[300]!,
+                      strokeWidth: 1,
                     ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Berat Saat Ini',
-                          style: TextStyle(color: Colors.grey),
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (value, meta) => Text(
+                          value.toStringAsFixed(1),
+                          style: TextStyle(fontSize: 10, color: Colors.grey[600]),
                         ),
-                        Text(
-                          '${offspring.weight?.toStringAsFixed(2)} kg',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index >= 0 && index < sortedRecords.length) {
+                            final date = sortedRecords[index].recordedAt;
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                '${date.day}/${date.month}',
+                                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                              ),
+                            );
+                          }
+                          return const Text('');
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: const Color(0xFF4CAF50),
+                      barWidth: 3,
+                      dotData: FlDotData(
+                        show: true,
+                        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+                          radius: 4,
+                          color: const Color(0xFF4CAF50),
+                          strokeWidth: 2,
+                          strokeColor: Colors.white,
+                        ),
+                      ),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        color: const Color(0xFF4CAF50).withAlpha(30),
+                      ),
+                    ),
+                  ],
+                  minY: minWeight - 0.5,
+                  maxY: maxWeight + 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddButton(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _showAddWeightDialog(context, ref),
+        icon: const Icon(Icons.add),
+        label: const Text('Tambah Data Berat'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF4CAF50),
+          side: const BorderSide(color: Color(0xFF4CAF50)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogList(BuildContext context, WidgetRef ref, List<WeightRecord> records) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.timeline, size: 20, color: Color(0xFF4CAF50)),
+                SizedBox(width: 8),
+                Text(
+                  'Riwayat Pengukuran',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...records.asMap().entries.map((entry) {
+              final index = entry.key;
+              final record = entry.value;
+              final isFirst = index == 0;
+              final isLast = index == records.length - 1;
+              
+              return IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Timeline indicator
+                    SizedBox(
+                      width: 24,
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isFirst ? const Color(0xFF4CAF50) : Colors.white,
+                              border: Border.all(
+                                color: const Color(0xFF4CAF50),
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                          if (!isLast)
+                            Expanded(
+                              child: Container(
+                                width: 2,
+                                color: const Color(0xFF4CAF50).withAlpha(100),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Content
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isFirst 
+                              ? const Color(0xFF4CAF50).withAlpha(15) 
+                              : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isFirst 
+                                ? const Color(0xFF4CAF50).withAlpha(50) 
+                                : Colors.grey[200]!,
                           ),
                         ),
-                      ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    record.formattedDate,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: isFirst ? const Color(0xFF2E7D32) : Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4CAF50),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    record.formattedWeight,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                InkWell(
+                                  onTap: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Hapus Data?'),
+                                        content: Text('Hapus data berat ${record.formattedWeight} pada ${record.formattedDate}?'),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(context, false),
+                                            child: const Text('Batal'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.pop(context, true),
+                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                            child: const Text('Hapus'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm == true) {
+                                      ref.read(offspringWeightRecordNotifierProvider(offspring.id).notifier).delete(record.id);
+                                    }
+                                  },
+                                  child: Icon(Icons.close, size: 18, color: Colors.grey[400]),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Umur: ${record.ageFormatted}',
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                            if (record.notes != null && record.notes!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '"${record.notes}"',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontStyle: FontStyle.italic,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-          const SizedBox(height: 16),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatAge(int days) {
+    final months = days ~/ 30;
+    final remainingDays = days % 30;
+    if (months > 0 && remainingDays > 0) {
+      return '${months}bln ${remainingDays}hr';
+    } else if (months > 0) {
+      return '${months}bln';
+    } else {
+      return '${remainingDays}hr';
+    }
+  }
+
+  void _showAddWeightDialog(BuildContext context, WidgetRef ref) {
+    final weightController = TextEditingController();
+    final notesController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+
+    int? calculateAgeDays() {
+      return selectedDate.difference(offspring.birthDate).inDays;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final ageDays = calculateAgeDays();
           
-          // Empty state for weight history
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.show_chart, size: 48, color: Colors.grey[300]),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Riwayat berat belum tersedia',
-                      style: TextStyle(color: Colors.grey[600]),
+          return AlertDialog(
+            title: const Text('Tambah Data Berat'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: weightController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Berat (kg)',
+                      hintText: '0.5',
+                      suffixText: 'kg',
+                      border: OutlineInputBorder(),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: offspring.birthDate,
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null) {
+                        setState(() => selectedDate = picked);
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Tanggal Pengukuran',
+                        border: OutlineInputBorder(),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'),
+                          const Icon(Icons.calendar_today, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (ageDays != null) ...[ 
                     const SizedBox(height: 8),
                     Text(
-                      'Fitur ini akan segera hadir',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                      'Umur saat pengukuran: ${_formatAge(ageDays)}',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
                     ),
                   ],
-                ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: notesController,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Keterangan (Opsional)',
+                      hintText: 'Contoh: Setelah sapih, sebelum jual, dll.',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final weight = double.tryParse(weightController.text);
+                  if (weight == null || weight <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Masukkan berat yang valid')),
+                    );
+                    return;
+                  }
+                  
+                  ref.read(offspringWeightRecordNotifierProvider(offspring.id).notifier).create(
+                    weight: weight,
+                    ageDays: calculateAgeDays(),
+                    recordedAt: selectedDate,
+                    notes: notesController.text.trim().isEmpty 
+                        ? null 
+                        : notesController.text.trim(),
+                  );
+                  
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Data berat berhasil ditambahkan'),
+                      backgroundColor: Color(0xFF4CAF50),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4CAF50),
+                ),
+                child: const Text('Simpan'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
+
 
 /// Tab 3: Kesehatan
 class _KesehatanTab extends ConsumerWidget {

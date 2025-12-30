@@ -1,7 +1,7 @@
 # 🛡️ DSFarm Flutter - Checkpoint
 
-> **Updated:** 2025-12-21 03:25 JST  
-> **Status:** Week 6+ Complete ✅
+> **Updated:** 2025-12-28 02:00 JST  
+> **Status:** Dashboard UI Overhaul Complete ✅
 
 ---
 
@@ -15,57 +15,81 @@
 | 4 | Breeding & Offspring | ✅ |
 | 5 | Finance & Inventory | ✅ |
 | 6 | Health, Reminders, Reports, Lineage | ✅ |
+| 7 | **Dashboard UI Overhaul** | ✅ |
 
 ---
 
-## 🆕 Week 6+ New Features
+## 🆕 Session 2025-12-28: Dashboard UI Overhaul
 
-| Feature | Status |
-|---------|--------|
-| Breeding→Offspring Integration | ✅ |
-| Livestock Auto-Code `[BREED]-[J/B][SEQ]` | ✅ |
-| Offspring Auto-Code `[DAM]-[SIRE].[DAM]-[DATE]-[SEQ]` | ✅ |
-| Breed Model/Repo/Provider | ✅ |
-| Settings Page (Breeds, Categories CRUD) | ✅ |
-| Finance Categories Notifier | ✅ |
-| **Infinite Loading Spinner Bug Fix** | ✅ |
-| Offspring Health Timeline View | ✅ |
-| Auto-Status "Siap Jual" (3+ months) | ✅ |
-| Promotion Offspring to Livestock | ✅ |
-| Accurate Calendar Age Calculation | ✅ |
-| Breeding Age Restriction (4+ months) | ✅ |
+### ✅ Completed Today
 
----
+| Feature | Description |
+|---------|-------------|
+| **DashboardShell** | New layout wrapper with sidebar (260px) + content area |
+| **Sidebar Navigation** | Logo, user profile, 10 menu items, logout |
+| **Router Nested Routes** | `/dashboard/:farmId/livestock`, `/breeding`, `/finance`, etc. |
+| **Dashboard Home Redesign** | Hero card + stats row (4x) + chart section |
+| **ALL 10 Screens Wrapped** | Consistent header + FAB pattern across app |
 
-## 🐛 Bug Fixed (2025-12-21)
+### 📁 Screens Updated
 
-**Infinite loading spinner on all menu pages**
-
-**Root Cause:** Notifier constructors initialized with `AsyncValue.loading()`, but when `_farmId == null`, `load()` never got called, leaving state stuck in loading.
-
-**Fix:** Updated all 10 notifier constructors to initialize with `AsyncValue.data([])` when `_farmId` is null.
-
-Files fixed:
-- `housing_provider.dart`
-- `livestock_provider.dart`
-- `offspring_provider.dart`
-- `breeding_provider.dart`
-- `finance_provider.dart` (2 notifiers)
-- `health_provider.dart`
-- `inventory_provider.dart`
-- `reminder_provider.dart`
-- `breed_provider.dart`
+| Screen | Index | Key Changes |
+|--------|-------|-------------|
+| Dashboard | 0 | Hero card (finance summary) + stats + chart |
+| Livestock | 1 | Header + tabs (Semua/Betina/Jantan) |
+| Breeding | 2 | Header + popup menu (Analytics/Calendar) |
+| Offspring | 3 | Header + tabs (Semua/Di Farm/Siap Jual/Terjual) |
+| Finance | 4 | Header + filters + chart + table |
+| Inventory | 5 | Header + tabs (by type) |
+| Health | 6 | Header + grouped list |
+| Reminders | 7 | Header + sections (Overdue/Today/Upcoming) |
+| Reports | 8 | Header + export + cards |
+| Settings | 9 | Header + list + about |
 
 ---
 
-## Database Tables (All with RLS)
+## 📁 Key Files Created/Modified
 
 ```
-farms, breeds, housings, livestocks,
-breeding_records, offsprings,
-finance_categories, finance_transactions,
-inventory_items, stock_movements,
-health_records, reminders
+lib/core/widgets/dashboard_shell.dart           # NEW - Layout wrapper
+lib/app_router.dart                             # MOD - Nested routes
+lib/features/dashboard/screens/dashboard_screen.dart  # MOD - Redesigned
+lib/features/livestock/screens/livestock_list_screen.dart  # MOD
+lib/features/breeding/screens/breeding_list_screen.dart    # MOD
+lib/features/offspring/screens/offspring_list_screen.dart  # MOD
+lib/features/finance/screens/finance_screen.dart           # MOD
+lib/features/inventory/screens/inventory_screen.dart       # MOD
+lib/features/health/screens/health_screen.dart             # MOD
+lib/features/reminder/screens/reminder_screen.dart         # MOD
+lib/features/reports/screens/reports_screen.dart           # MOD
+lib/features/settings/screens/settings_screen.dart         # MOD
+```
+
+---
+
+## 🎨 New Layout Architecture
+
+```
+┌───────────────────────────────────────────────────────────┐
+│ 🐰 DSFarm              │ Content Area                     │
+├────────────────────────┤                                  │
+│ 👤 User                │  ┌─────────────────────────────┐ │
+│    Farm: [Name]        │  │ Header: Title         [+]   │ │
+├────────────────────────┤  ├─────────────────────────────┤ │
+│ 📊 Overview (Home)    *│  │                             │ │
+│ 🐰 Ternak              │  │     Content                 │ │
+│ 💕 Breeding            │  │                             │ │
+│ 🐣 Anakan              │  │                             │ │
+│ 💰 Keuangan            │  │                             │ │
+│ 📦 Inventaris          │  │                             │ │
+│ ─────────────────      │  └─────────────────────────────┘ │
+│ 🏥 Kesehatan           │                                  │
+│ 🔔 Pengingat           │                                  │
+│ 📈 Laporan             │                                  │
+├────────────────────────┤                                  │
+│ ⚙️ Pengaturan          │                                  │
+│ 🚪 Keluar              │                                  │
+└────────────────────────┴──────────────────────────────────┘
 ```
 
 ---
@@ -83,7 +107,9 @@ password: 1123456
 
 ---
 
-## Next Steps
+## Next Steps (Optional)
 
-- [ ] Polish UI & responsive design
-- [ ] Deploy to production
+- [ ] Farm selector dropdown in sidebar
+- [ ] Theme toggle button
+- [ ] Recent activities panel on dashboard
+- [ ] Mobile responsive improvements

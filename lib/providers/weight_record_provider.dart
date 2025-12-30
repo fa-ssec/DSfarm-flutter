@@ -20,7 +20,13 @@ final weightRecordsProvider = FutureProvider.family<List<WeightRecord>, String>(
   return repository.getByLivestock(livestockId);
 });
 
-/// Notifier for weight record operations
+/// Provider for weight records of a specific offspring
+final offspringWeightRecordsProvider = FutureProvider.family<List<WeightRecord>, String>((ref, offspringId) async {
+  final repository = ref.watch(weightRecordRepositoryProvider);
+  return repository.getByOffspring(offspringId);
+});
+
+/// Notifier for weight record operations (livestock)
 class WeightRecordNotifier extends StateNotifier<AsyncValue<List<WeightRecord>>> {
   final WeightRecordRepository _repository;
   final String _livestockId;
@@ -65,7 +71,7 @@ class WeightRecordNotifier extends StateNotifier<AsyncValue<List<WeightRecord>>>
   }
 }
 
-/// Provider for WeightRecordNotifier
+/// Provider for WeightRecordNotifier (livestock)
 final weightRecordNotifierProvider = StateNotifierProvider.family<
     WeightRecordNotifier, 
     AsyncValue<List<WeightRecord>>, 
@@ -73,4 +79,58 @@ final weightRecordNotifierProvider = StateNotifierProvider.family<
 >((ref, livestockId) {
   final repository = ref.watch(weightRecordRepositoryProvider);
   return WeightRecordNotifier(repository, livestockId, ref);
+});
+
+/// Notifier for weight record operations (offspring)
+class OffspringWeightRecordNotifier extends StateNotifier<AsyncValue<List<WeightRecord>>> {
+  final WeightRecordRepository _repository;
+  final String _offspringId;
+  final Ref _ref;
+
+  OffspringWeightRecordNotifier(this._repository, this._offspringId, this._ref) 
+      : super(const AsyncValue.loading()) {
+    loadRecords();
+  }
+
+  Future<void> loadRecords() async {
+    state = const AsyncValue.loading();
+    try {
+      final records = await _repository.getByOffspring(_offspringId);
+      state = AsyncValue.data(records);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> create({
+    required double weight,
+    int? ageDays,
+    required DateTime recordedAt,
+    String? notes,
+  }) async {
+    await _repository.create(
+      offspringId: _offspringId,
+      weight: weight,
+      ageDays: ageDays,
+      recordedAt: recordedAt,
+      notes: notes,
+    );
+    await loadRecords();
+    _ref.invalidate(offspringWeightRecordsProvider(_offspringId));
+  }
+
+  Future<void> delete(String id) async {
+    await _repository.delete(id);
+    await loadRecords();
+  }
+}
+
+/// Provider for OffspringWeightRecordNotifier
+final offspringWeightRecordNotifierProvider = StateNotifierProvider.family<
+    OffspringWeightRecordNotifier, 
+    AsyncValue<List<WeightRecord>>, 
+    String
+>((ref, offspringId) {
+  final repository = ref.watch(weightRecordRepositoryProvider);
+  return OffspringWeightRecordNotifier(repository, offspringId, ref);
 });

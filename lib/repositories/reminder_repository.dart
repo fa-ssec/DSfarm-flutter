@@ -101,37 +101,58 @@ class ReminderRepository {
   }
 
   /// Create breeding-related reminders automatically
+  /// Uses H-1 timing (reminder day before actual event)
   Future<void> createBreedingReminders({
     required String farmId,
     required String breedingRecordId,
     required String damName,
     required DateTime matingDate,
     required DateTime? expectedBirthDate,
-    int palpationDays = 12,
-    int weaningDays = 35,
+    int palpationReminderDays = 11,  // H-1 for palpation at H+12
+    int birthReminderDays = 30,      // H-1 for birth at H+31
   }) async {
-    // Palpation reminder (12 days after mating for rabbits)
+    // Palpation reminder (H-1: day 11 for palpation on day 12)
     await create(
       farmId: farmId,
       type: ReminderType.palpation,
       title: 'Palpasi $damName',
-      description: 'Cek kebuntingan $damName',
-      dueDate: matingDate.add(Duration(days: palpationDays)),
+      description: 'Besok: Cek kebuntingan $damName',
+      dueDate: matingDate.add(Duration(days: palpationReminderDays)),
       referenceId: breedingRecordId,
       referenceType: 'breeding_record',
     );
 
-    // Expected birth reminder
+    // Expected birth reminder (H-1: day 30 for birth on day 31)
     if (expectedBirthDate != null) {
       await create(
         farmId: farmId,
         type: ReminderType.expectedBirth,
         title: 'Perkiraan lahir $damName',
-        description: 'Siapkan kandang kelahiran',
-        dueDate: expectedBirthDate.subtract(const Duration(days: 2)),
+        description: 'Besok: Siapkan kandang kelahiran untuk $damName',
+        dueDate: matingDate.add(Duration(days: birthReminderDays)),
         referenceId: breedingRecordId,
         referenceType: 'breeding_record',
       );
     }
+  }
+
+  /// Create weaning reminder (to be called after birth is recorded)
+  /// Uses H-1 timing (reminder day before weaning at H+35 from birth)
+  Future<void> createWeaningReminder({
+    required String farmId,
+    required String breedingRecordId,
+    required String damName,
+    required DateTime birthDate,
+    int weaningReminderDays = 34, // H-1 for weaning at H+35 after birth
+  }) async {
+    await create(
+      farmId: farmId,
+      type: ReminderType.weaning,
+      title: 'Penyapihan $damName',
+      description: 'Besok: Pisahkan anak dari induk $damName',
+      dueDate: birthDate.add(Duration(days: weaningReminderDays)),
+      referenceId: breedingRecordId,
+      referenceType: 'breeding_record',
+    );
   }
 }

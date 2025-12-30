@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/dashboard_shell.dart';
 import '../../../models/reminder.dart';
 import '../../../providers/reminder_provider.dart';
 
@@ -15,25 +16,41 @@ class ReminderScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final remindersAsync = ref.watch(reminderNotifierProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pengingat'),
-      ),
-      body: remindersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (reminders) {
-          if (reminders.isEmpty) {
-            return _buildEmptyState(context, ref);
-          }
-          return _buildList(context, ref, reminders);
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDialog(context, ref),
-        child: const Icon(Icons.add),
+    return DashboardShell(
+      selectedIndex: 6, // Pengingat
+      child: Column(
+        children: [
+          // Header
+          Container(
+            color: colorScheme.surface,
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Text('Pengingat', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
+                const Spacer(),
+                FloatingActionButton.small(
+                  heroTag: 'addReminder',
+                  onPressed: () => _showAddDialog(context, ref),
+                  child: const Icon(Icons.add),
+                ),
+              ],
+            ),
+          ),
+          // Content
+          Expanded(
+            child: remindersAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+              data: (reminders) {
+                if (reminders.isEmpty) return _buildEmptyState(context, ref);
+                return _buildList(context, ref, reminders);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

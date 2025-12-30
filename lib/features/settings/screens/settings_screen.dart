@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/dashboard_shell.dart';
 import 'breeds_settings_screen.dart';
 import 'blocks_settings_screen.dart';
 import 'finance_categories_settings_screen.dart';
@@ -15,47 +16,55 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pengaturan'),
-      ),
-      body: ListView(
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return DashboardShell(
+      selectedIndex: 8, // Pengaturan
+      child: Column(
         children: [
-          const _SectionHeader(title: 'Data Master'),
-          _SettingsTile(
-            icon: Icons.apartment,
-            title: 'Block Kandang',
-            subtitle: 'Kelola gedung/area kandang',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const BlocksSettingsScreen()),
+          // Header
+          Container(
+            color: colorScheme.surface,
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Text('Pengaturan', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
+              ],
             ),
           ),
-          _SettingsTile(
-            icon: Icons.pets,
-            title: 'Ras (Breeds)',
-            subtitle: 'Kelola jenis/ras ternak',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const BreedsSettingsScreen()),
+          // Content
+          Expanded(
+            child: ListView(
+              children: [
+                const _SectionHeader(title: 'Data Master'),
+                _SettingsTile(
+                  icon: Icons.apartment,
+                  title: 'Block Kandang',
+                  subtitle: 'Kelola gedung/area kandang',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BlocksSettingsScreen())),
+                ),
+                _SettingsTile(
+                  icon: Icons.pets,
+                  title: 'Ras (Breeds)',
+                  subtitle: 'Kelola jenis/ras ternak',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BreedsSettingsScreen())),
+                ),
+                _SettingsTile(
+                  icon: Icons.category,
+                  title: 'Kategori Keuangan',
+                  subtitle: 'Kelola kategori pemasukan & pengeluaran',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceCategoriesSettingsScreen())),
+                ),
+                const Divider(),
+                const _SectionHeader(title: 'Aplikasi'),
+                _SettingsTile(
+                  icon: Icons.info_outline,
+                  title: 'Tentang Aplikasi',
+                  subtitle: 'DSFarm v1.0.0',
+                  onTap: () => _showAboutDialog(context),
+                ),
+              ],
             ),
-          ),
-          _SettingsTile(
-            icon: Icons.category,
-            title: 'Kategori Keuangan',
-            subtitle: 'Kelola kategori pemasukan & pengeluaran',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FinanceCategoriesSettingsScreen()),
-            ),
-          ),
-          const Divider(),
-          const _SectionHeader(title: 'Aplikasi'),
-          _SettingsTile(
-            icon: Icons.info_outline,
-            title: 'Tentang Aplikasi',
-            subtitle: 'DSFarm v1.0.0',
-            onTap: () => _showAboutDialog(context),
           ),
         ],
       ),

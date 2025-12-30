@@ -6,7 +6,8 @@ library;
 
 class WeightRecord {
   final String id;
-  final String livestockId;
+  final String? livestockId;
+  final String? offspringId;
   final double weight;
   final int? ageDays;
   final DateTime recordedAt;
@@ -15,7 +16,8 @@ class WeightRecord {
 
   const WeightRecord({
     required this.id,
-    required this.livestockId,
+    this.livestockId,
+    this.offspringId,
     required this.weight,
     this.ageDays,
     required this.recordedAt,
@@ -26,7 +28,8 @@ class WeightRecord {
   factory WeightRecord.fromJson(Map<String, dynamic> json) {
     return WeightRecord(
       id: json['id'] as String,
-      livestockId: json['livestock_id'] as String,
+      livestockId: json['livestock_id'] as String?,
+      offspringId: json['offspring_id'] as String?,
       weight: (json['weight'] as num).toDouble(),
       ageDays: json['age_days'] as int?,
       recordedAt: DateTime.parse(json['recorded_at'] as String),
@@ -40,11 +43,13 @@ class WeightRecord {
   Map<String, dynamic> toJson() => {
     'id': id,
     'livestock_id': livestockId,
+    'offspring_id': offspringId,
     'weight': weight,
     'age_days': ageDays,
     'recorded_at': recordedAt.toIso8601String(),
     'notes': notes,
   };
+
 
   /// Format umur saat pengukuran
   String get ageFormatted {

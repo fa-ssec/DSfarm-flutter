@@ -344,6 +344,14 @@ pie title Subscription Tiers
 
 ---
 
+## 📋 Future Backlog
+
+| Item | Priority | Description |
+|------|----------|-------------|
+| Custom Date Range Picker | Medium | Buat tampilan date range picker identik dengan showDatePicker (panel kiri + kalender) dengan fitur block selection untuk rentang tanggal. Lokasi: `finance_screen.dart` → `_showDateRangeDialog()` |
+| Edit Transaction | Low | Tambah fitur edit transaksi di finance detail modal |
+| Finance Export | Low | Export laporan keuangan ke PDF/Excel |
+
 ## 📚 Documentation Files
 
 | File | Purpose |

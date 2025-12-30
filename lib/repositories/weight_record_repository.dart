@@ -23,16 +23,34 @@ class WeightRecordRepository {
         .toList();
   }
 
-  /// Create a new weight record
+  /// Get all weight records for an offspring, ordered by date descending
+  Future<List<WeightRecord>> getByOffspring(String offspringId) async {
+    final response = await SupabaseService.client
+        .from(_tableName)
+        .select()
+        .eq('offspring_id', offspringId)
+        .order('recorded_at', ascending: false);
+
+    return (response as List)
+        .map((json) => WeightRecord.fromJson(json))
+        .toList();
+  }
+
+  /// Create a new weight record (for livestock or offspring)
   Future<WeightRecord> create({
-    required String livestockId,
+    String? livestockId,
+    String? offspringId,
     required double weight,
     int? ageDays,
     required DateTime recordedAt,
     String? notes,
   }) async {
+    assert(livestockId != null || offspringId != null, 
+        'Either livestockId or offspringId must be provided');
+
     final data = {
       'livestock_id': livestockId,
+      'offspring_id': offspringId,
       'weight': weight,
       'age_days': ageDays,
       'recorded_at': recordedAt.toIso8601String(),
@@ -45,8 +63,12 @@ class WeightRecordRepository {
         .select()
         .single();
 
-    // Also update the livestock's current weight to the latest
-    await _updateLivestockWeight(livestockId, weight);
+    // Update the entity's current weight
+    if (livestockId != null) {
+      await _updateLivestockWeight(livestockId, weight);
+    } else if (offspringId != null) {
+      await _updateOffspringWeight(offspringId, weight);
+    }
 
     return WeightRecord.fromJson(response);
   }
@@ -65,5 +87,13 @@ class WeightRecordRepository {
         .from('livestocks')
         .update({'weight': weight, 'updated_at': DateTime.now().toIso8601String()})
         .eq('id', livestockId);
+  }
+
+  /// Update offspring's current weight to the most recent record
+  Future<void> _updateOffspringWeight(String offspringId, double weight) async {
+    await SupabaseService.client
+        .from('offsprings')
+        .update({'weight': weight, 'updated_at': DateTime.now().toIso8601String()})
+        .eq('id', offspringId);
   }
 }

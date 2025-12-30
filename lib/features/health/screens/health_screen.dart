@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/dashboard_shell.dart';
 import '../../../models/health_record.dart';
 import '../../../providers/health_provider.dart';
 import '../../../providers/livestock_provider.dart';
@@ -16,25 +17,41 @@ class HealthScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final healthAsync = ref.watch(healthNotifierProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kesehatan'),
-      ),
-      body: healthAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (records) {
-          if (records.isEmpty) {
-            return _buildEmptyState(context, ref);
-          }
-          return _buildList(context, ref, records);
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDialog(context, ref),
-        child: const Icon(Icons.add),
+    return DashboardShell(
+      selectedIndex: 5, // Kesehatan
+      child: Column(
+        children: [
+          // Header
+          Container(
+            color: colorScheme.surface,
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Text('Kesehatan', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
+                const Spacer(),
+                FloatingActionButton.small(
+                  heroTag: 'addHealth',
+                  onPressed: () => _showAddDialog(context, ref),
+                  child: const Icon(Icons.add),
+                ),
+              ],
+            ),
+          ),
+          // Content
+          Expanded(
+            child: healthAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+              data: (records) {
+                if (records.isEmpty) return _buildEmptyState(context, ref);
+                return _buildList(context, ref, records);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

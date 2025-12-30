@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/dashboard_shell.dart';
 import '../../../models/inventory.dart';
 import '../../../providers/inventory_provider.dart';
 
@@ -35,26 +36,51 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inventaris'),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabs: InventoryType.values.map((type) {
-            return Tab(text: type.displayName);
-          }).toList(),
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: InventoryType.values.map((type) {
-          return _InventoryTab(type: type);
-        }).toList(),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddDialog(context),
-        child: const Icon(Icons.add),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DashboardShell(
+      selectedIndex: 4, // Inventaris
+      child: Column(
+        children: [
+          // Header with tabs
+          Container(
+            color: colorScheme.surface,
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('Inventaris', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
+                    const Spacer(),
+                    FloatingActionButton.small(
+                      heroTag: 'addInventory',
+                      onPressed: () => _showAddDialog(context),
+                      child: const Icon(Icons.add),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  tabs: InventoryType.values.map((type) {
+                    return Tab(text: type.displayName);
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          // Tab content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: InventoryType.values.map((type) {
+                return _InventoryTab(type: type);
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -7,12 +7,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/breeding_record.dart';
-import '../models/offspring.dart';
-import '../models/reminder.dart';
+import '../models/offspring.dart';  // Gender comes from here
 import '../repositories/breeding_repository.dart';
 import '../repositories/offspring_repository.dart';
 import '../repositories/reminder_repository.dart';
-import '../repositories/livestock_repository.dart';
+import '../repositories/livestock_repository.dart' hide Gender;
 import '../providers/farm_provider.dart';
 
 /// Repository provider
@@ -213,17 +212,14 @@ class BreedingNotifier extends StateNotifier<AsyncValue<List<BreedingRecord>>> {
         
         debugPrint('Total offspring created: $createdCount');
 
-        // Create weaning reminder (birth + 35 days)
-        await _reminderRepo.create(
-          farmId: _farmId,
-          type: ReminderType.weaning,
-          title: 'Sapih anak ${breeding.damCode ?? "Induk"}',
-          description: '$aliveCount ekor siap disapih',
-          dueDate: birthDate.add(const Duration(days: 35)),
-          referenceId: id,
-          referenceType: 'breeding_record',
-        );
-        debugPrint('Weaning reminder created');
+        // Create weaning reminder using H-1 timing (day 34 for weaning on day 35)
+      await _reminderRepo.createWeaningReminder(
+        farmId: _farmId,
+        breedingRecordId: id,
+        damName: breeding.damCode ?? 'Induk',
+        birthDate: birthDate,
+      );
+      debugPrint('Weaning reminder created with H-1 timing');
       } catch (e, stackTrace) {
         // Log offspring creation errors for debugging
         debugPrint('Error creating offspring: $e');

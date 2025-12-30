@@ -11,6 +11,7 @@ import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/widgets/dashboard_shell.dart';
 import '../../../providers/farm_provider.dart';
 import '../../../providers/livestock_provider.dart';
 import '../../../providers/breeding_provider.dart';
@@ -241,22 +242,29 @@ class ReportsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Laporan'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-            tooltip: 'Export PDF',
-            onPressed: () => _showExportOptions(context, ref),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    return DashboardShell(
+      selectedIndex: 7, // Laporan
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header
+            Row(
+              children: [
+                Text('Laporan', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
+                const Spacer(),
+                FloatingActionButton.small(
+                  heroTag: 'exportReport',
+                  onPressed: () => _showExportOptions(context, ref),
+                  child: const Icon(Icons.download),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
             const Text(
               'Ringkasan Populasi',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),

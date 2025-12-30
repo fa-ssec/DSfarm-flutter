@@ -1,12 +1,14 @@
 /// Livestock List Screen
 /// 
 /// Screen untuk melihat dan mengelola indukan/pejantan.
+/// Redesigned to match reference with card grid, filter tabs, view toggle.
 
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/dashboard_shell.dart';
 import '../../../models/livestock.dart';
 import '../../../providers/livestock_provider.dart';
 import '../widgets/livestock_detail_modal.dart';
@@ -19,322 +21,354 @@ class LivestockListScreen extends ConsumerStatefulWidget {
   ConsumerState<LivestockListScreen> createState() => _LivestockListScreenState();
 }
 
-class _LivestockListScreenState extends ConsumerState<LivestockListScreen> 
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+class _LivestockListScreenState extends ConsumerState<LivestockListScreen> {
+  String _filter = 'all'; // all, female, male
+  bool _isGridView = true;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Indukan'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Semua'),
-            Tab(text: '♀️ Betina'),
-            Tab(text: '♂️ Jantan'),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _LivestockTab(filter: null),
-          _LivestockTab(filter: Gender.female),
-          _LivestockTab(filter: Gender.male),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CreateLivestockScreen()),
-        ),
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-class _LivestockTab extends ConsumerWidget {
-  final Gender? filter;
-
-  const _LivestockTab({this.filter});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
     final livestocksAsync = ref.watch(livestockNotifierProvider);
 
-    return livestocksAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
-            const SizedBox(height: 16),
-            Text('Error: $error'),
-            ElevatedButton(
-              onPressed: () => ref.refresh(livestockNotifierProvider),
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+    return DashboardShell(
+      selectedIndex: 1, // Ternak
+      child: livestocksAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (livestocks) {
+          // Count by gender
+          final allCount = livestocks.length;
+          final femaleCount = livestocks.where((l) => l.gender == Gender.female).length;
+          final maleCount = livestocks.where((l) => l.gender == Gender.male).length;
+          
+          // Apply filter
+          final filtered = _filter == 'all'
+              ? livestocks
+              : _filter == 'female'
+                  ? livestocks.where((l) => l.gender == Gender.female).toList()
+                  : livestocks.where((l) => l.gender == Gender.male).toList();
+
+          return Column(
+            children: [
+              // ═══════════════════════════════════════════
+              // HEADER
+              // ═══════════════════════════════════════════
+              Container(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Ternak', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 4),
+                            Text('$allCount ekor indukan', style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
+                          ],
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: () => showDialog(
+                            context: context,
+                            builder: (_) => const Dialog(
+                              child: CreateLivestockScreen(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.add, size: 18),
+                          label: const Text('Tambah Ternak'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // Filter tabs and view toggle row
+                    Row(
+                      children: [
+                        // Filter pills
+                        _FilterPill(
+                          label: 'Semua',
+                          count: allCount,
+                          isSelected: _filter == 'all',
+                          onTap: () => setState(() => _filter = 'all'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterPill(
+                          label: 'Betina',
+                          count: femaleCount,
+                          isSelected: _filter == 'female',
+                          onTap: () => setState(() => _filter = 'female'),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterPill(
+                          label: 'Jantan',
+                          count: maleCount,
+                          isSelected: _filter == 'male',
+                          onTap: () => setState(() => _filter = 'male'),
+                        ),
+                        const Spacer(),
+                        // View toggle
+                        Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              _ViewToggle(
+                                icon: Icons.grid_view_rounded,
+                                isSelected: _isGridView,
+                                onTap: () => setState(() => _isGridView = true),
+                              ),
+                              _ViewToggle(
+                                icon: Icons.view_list_rounded,
+                                isSelected: !_isGridView,
+                                onTap: () => setState(() => _isGridView = false),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // ═══════════════════════════════════════════
+              // CONTENT
+              // ═══════════════════════════════════════════
+              Expanded(
+                child: filtered.isEmpty
+                    ? _buildEmptyState(context)
+                    : _isGridView
+                        ? _buildGridView(context, filtered)
+                        : _buildListView(context, filtered),
+              ),
+            ],
+          );
+        },
       ),
-      data: (livestocks) {
-        // Apply filter
-        final filtered = filter == null
-            ? livestocks
-            : livestocks.where((l) => l.gender == filter).toList();
+    );
+  }
 
-        if (filtered.isEmpty) {
-          return _buildEmptyState(context, filter);
-        }
-
-        // Responsive layout
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            // Web/Desktop: Table view (≥600px)
-            if (constraints.maxWidth >= 600) {
-              return _buildTableView(context, ref, filtered);
-            }
-            // Mobile: Card list
-            return _buildCardList(context, ref, filtered);
-          },
+  Widget _buildGridView(BuildContext context, List<Livestock> filtered) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate columns based on width
+        final crossAxisCount = constraints.maxWidth > 1200 ? 4 
+            : constraints.maxWidth > 900 ? 3 
+            : constraints.maxWidth > 600 ? 2 
+            : 1;
+        
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 1.4,
+          ),
+          itemCount: filtered.length,
+          itemBuilder: (context, index) => _LivestockCard(
+            livestock: filtered[index],
+            onTap: () => showLivestockDetailModal(context, ref, filtered[index]),
+          ),
         );
       },
     );
   }
 
-  Widget _buildTableView(BuildContext context, WidgetRef ref, List<Livestock> filtered) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+  Widget _buildListView(BuildContext context, List<Livestock> filtered) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) => _LivestockListItem(
+        livestock: filtered[index],
+        onTap: () => showLivestockDetailModal(context, ref, filtered[index]),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final label = _filter == 'all' ? 'indukan' : _filter == 'female' ? 'betina' : 'jantan';
+    
+    return Center(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Table header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey[850],
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-            ),
-            child: Row(
-              children: [
-                const Expanded(flex: 2, child: Text('ID INDUKAN', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.grey))),
-                const Expanded(flex: 2, child: Text('TANGGAL LAHIR', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.grey))),
-                const Expanded(flex: 1, child: Text('BOBOT', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.grey))),
-                const Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Colors.grey))),
-              ],
-            ),
-          ),
-          // Table rows
-          ...filtered.map((livestock) => _TableRow(
-            livestock: livestock,
-            onTap: () => _showDetail(context, ref, livestock),
-          )),
+          Icon(Icons.pets, size: 64, color: colorScheme.outlineVariant),
+          const SizedBox(height: 16),
+          Text('Belum ada $label', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          Text('Tambahkan ternak pertama untuk mulai', style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
         ],
       ),
     );
   }
+}
 
-  Widget _buildCardList(BuildContext context, WidgetRef ref, List<Livestock> filtered) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: filtered.length,
-      itemBuilder: (context, index) {
-        final livestock = filtered[index];
-        return _LivestockCard(
-          livestock: livestock,
-          onTap: () => _showDetail(context, ref, livestock),
-        );
-      },
-    );
-  }
+// ═══════════════════════════════════════════════════════════════════════════
+// FILTER PILL
+// ═══════════════════════════════════════════════════════════════════════════
+class _FilterPill extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool isSelected;
+  final VoidCallback onTap;
 
-  Widget _buildEmptyState(BuildContext context, Gender? filter) {
-    final label = filter == null 
-        ? 'indukan' 
-        : filter == Gender.female 
-            ? 'induk betina' 
-            : 'pejantan';
-    
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.pets, size: 64, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Belum ada $label',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tambahkan $label pertama untuk mulai',
-              style: TextStyle(color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-          ],
+  const _FilterPill({
+    required this.label,
+    required this.count,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1F2937) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF1F2937) : Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+        child: Text(
+          '$label ($count)',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+          ),
         ),
       ),
     );
   }
+}
 
-  void _showDetail(BuildContext context, WidgetRef ref, Livestock livestock) {
-    showLivestockDetailModal(context, ref, livestock);
+// ═══════════════════════════════════════════════════════════════════════════
+// VIEW TOGGLE
+// ═══════════════════════════════════════════════════════════════════════════
+class _ViewToggle extends StatelessWidget {
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ViewToggle({
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(
+          icon,
+          size: 20,
+          color: isSelected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LIVESTOCK CARD (Grid View)
+// ═══════════════════════════════════════════════════════════════════════════
 class _LivestockCard extends StatelessWidget {
   final Livestock livestock;
   final VoidCallback onTap;
 
   const _LivestockCard({required this.livestock, required this.onTap});
 
-  Color _getStatusColor() {
-    switch (livestock.status) {
-      case LivestockStatus.siapKawin:
-        return const Color(0xFF9C27B0); // Purple
-      case LivestockStatus.bunting:
-      case LivestockStatus.menyusui:
-        return const Color(0xFFE91E63); // Pink
-      case LivestockStatus.pejantanAktif:
-        return const Color(0xFF2196F3); // Blue
-      case LivestockStatus.betinaMuda:
-      case LivestockStatus.pejantanMuda:
-        return const Color(0xFF4CAF50); // Green
-      case LivestockStatus.istirahat:
-        return const Color(0xFF9E9E9E); // Grey
-      case LivestockStatus.sold:
-        return const Color(0xFF607D8B); // Blue Grey
-      case LivestockStatus.deceased:
-        return const Color(0xFFF44336); // Red
-      case LivestockStatus.culled:
-        return const Color(0xFFFF9800); // Orange
-    }
-  }
-
-  IconData _getStatusIcon() {
-    switch (livestock.status) {
-      case LivestockStatus.siapKawin:
-        return Icons.favorite;
-      case LivestockStatus.bunting:
-        return Icons.pregnant_woman;
-      case LivestockStatus.menyusui:
-        return Icons.child_care;
-      case LivestockStatus.pejantanAktif:
-        return Icons.bolt;
-      case LivestockStatus.betinaMuda:
-      case LivestockStatus.pejantanMuda:
-        return Icons.pets;
-      case LivestockStatus.istirahat:
-        return Icons.pause_circle;
-      case LivestockStatus.sold:
-        return Icons.attach_money;
-      case LivestockStatus.deceased:
-        return Icons.error;
-      case LivestockStatus.culled:
-        return Icons.highlight_off;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final genderColor = livestock.isFemale ? const Color(0xFFE91E63) : const Color(0xFF2196F3);
-    final statusColor = _getStatusColor();
-    
+    final colorScheme = Theme.of(context).colorScheme;
+    final isFemale = livestock.gender == Gender.female;
+    final genderColor = isFemale ? const Color(0xFFEC4899) : const Color(0xFF3B82F6);
+    final genderBgColor = isFemale ? const Color(0xFFFCE7F3) : const Color(0xFFDBEAFE);
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.zero,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Row 1: Gender+Code and Weight
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        livestock.genderIcon,
-                        style: TextStyle(fontSize: 16, color: genderColor),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        livestock.code,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: genderColor,
-                        ),
-                      ),
-                    ],
+              // Gender icon
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: genderBgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Text(
+                    isFemale ? '♀' : '♂',
+                    style: TextStyle(fontSize: 24, color: genderColor, fontWeight: FontWeight.w600),
                   ),
-                  Text(
-                    livestock.weight != null ? '${livestock.weight} kg' : '-',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 8),
-              // Row 2: Age and Status Badge
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    livestock.ageFormatted,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+              const SizedBox(width: 14),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ID and Status
+                    Row(
                       children: [
-                        Icon(
-                          _getStatusIcon(),
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 4),
                         Text(
-                          livestock.status.displayName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          livestock.code,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                         ),
+                        const SizedBox(width: 8),
+                        _StatusBadge(status: livestock.status),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    // Ras
+                    Text(
+                      'Ras: ${livestock.breedName ?? '-'}',
+                      style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 4),
+                    // Umur
+                    Text(
+                      'Umur: ${livestock.ageFormatted}',
+                      style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 4),
+                    // Berat
+                    Text(
+                      'Berat: ${livestock.weight != null ? '${livestock.weight} kg' : '-'}',
+                      style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -344,193 +378,129 @@ class _LivestockCard extends StatelessWidget {
   }
 }
 
-/// Table row for web/desktop view
-class _TableRow extends StatelessWidget {
+// ═══════════════════════════════════════════════════════════════════════════
+// LIVESTOCK LIST ITEM (List View)
+// ═══════════════════════════════════════════════════════════════════════════
+class _LivestockListItem extends StatelessWidget {
   final Livestock livestock;
   final VoidCallback onTap;
 
-  const _TableRow({required this.livestock, required this.onTap});
-
-  Color _getStatusColor() {
-    switch (livestock.status) {
-      case LivestockStatus.siapKawin:
-        return const Color(0xFF9C27B0); // Purple
-      case LivestockStatus.bunting:
-      case LivestockStatus.menyusui:
-        return const Color(0xFFE91E63); // Pink
-      case LivestockStatus.pejantanAktif:
-        return const Color(0xFF2196F3); // Blue
-      case LivestockStatus.betinaMuda:
-      case LivestockStatus.pejantanMuda:
-        return const Color(0xFF4CAF50); // Green
-      case LivestockStatus.istirahat:
-        return const Color(0xFF9E9E9E); // Grey
-      case LivestockStatus.sold:
-        return const Color(0xFF607D8B); // Blue Grey
-      case LivestockStatus.deceased:
-        return const Color(0xFFF44336); // Red
-      case LivestockStatus.culled:
-        return const Color(0xFFFF9800); // Orange
-    }
-  }
-
-  IconData _getStatusIcon() {
-    switch (livestock.status) {
-      case LivestockStatus.siapKawin:
-        return Icons.favorite;
-      case LivestockStatus.bunting:
-        return Icons.pregnant_woman;
-      case LivestockStatus.menyusui:
-        return Icons.child_care;
-      case LivestockStatus.pejantanAktif:
-        return Icons.bolt;
-      case LivestockStatus.betinaMuda:
-      case LivestockStatus.pejantanMuda:
-        return Icons.pets;
-      case LivestockStatus.istirahat:
-        return Icons.pause_circle;
-      case LivestockStatus.sold:
-        return Icons.attach_money;
-      case LivestockStatus.deceased:
-        return Icons.error;
-      case LivestockStatus.culled:
-        return Icons.highlight_off;
-    }
-  }
+  const _LivestockListItem({required this.livestock, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final genderColor = livestock.isFemale ? const Color(0xFFE91E63) : const Color(0xFF2196F3);
-    final statusColor = _getStatusColor();
-    
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey[800]!)),
-        ),
-        child: Row(
-          children: [
-            // ID Indukan
-            Expanded(
-              flex: 2,
-              child: Row(
-                children: [
-                  Text(
-                    livestock.genderIcon,
-                    style: TextStyle(fontSize: 14, color: genderColor),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    livestock.code,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: genderColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Tanggal Lahir
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    livestock.birthDate != null
-                        ? _formatDate(livestock.birthDate!)
-                        : '-',
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  Text(
-                    livestock.ageFormatted,
-                    style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                  ),
-                ],
-              ),
-            ),
-            // Bobot
-            Expanded(
-              flex: 1,
-              child: Text(
-                livestock.weight != null ? '${livestock.weight} kg' : '-',
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-            ),
-            // Status
-            Expanded(
-              flex: 2,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    final colorScheme = Theme.of(context).colorScheme;
+    final isFemale = livestock.gender == Gender.female;
+    final genderColor = isFemale ? const Color(0xFFEC4899) : const Color(0xFF3B82F6);
+    final genderBgColor = isFemale ? const Color(0xFFFCE7F3) : const Color(0xFFDBEAFE);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Gender icon
+              Container(
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(16),
+                  color: genderBgColor,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Center(
+                  child: Text(
+                    isFemale ? '♀' : '♂',
+                    style: TextStyle(fontSize: 20, color: genderColor, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      _getStatusIcon(),
-                      size: 14,
-                      color: Colors.white,
+                    Row(
+                      children: [
+                        Text(livestock.code, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                        const SizedBox(width: 8),
+                        _StatusBadge(status: livestock.status),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        livestock.status.displayName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 13,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${livestock.breedName ?? '-'} • ${livestock.ageFormatted} • ${livestock.weight != null ? '${livestock.weight} kg' : '-'}',
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+              Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  String _formatDate(DateTime date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
-  }
 }
 
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final String value;
+// ═══════════════════════════════════════════════════════════════════════════
+// STATUS BADGE
+// ═══════════════════════════════════════════════════════════════════════════
+class _StatusBadge extends StatelessWidget {
+  final LivestockStatus status;
 
-  const _DetailRow({required this.label, required this.value});
+  const _StatusBadge({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
+    Color bgColor;
+    Color textColor;
+
+    switch (status) {
+      case LivestockStatus.bunting:
+        bgColor = const Color(0xFFFCE7F3);
+        textColor = const Color(0xFFBE185D);
+      case LivestockStatus.siapKawin:
+        bgColor = const Color(0xFFD1FAE5);
+        textColor = const Color(0xFF047857);
+      case LivestockStatus.menyusui:
+        bgColor = const Color(0xFFFEF3C7);
+        textColor = const Color(0xFFB45309);
+      case LivestockStatus.pejantanAktif:
+        bgColor = const Color(0xFFDBEAFE);
+        textColor = const Color(0xFF1D4ED8);
+      case LivestockStatus.betinaMuda:
+      case LivestockStatus.pejantanMuda:
+        bgColor = const Color(0xFFE0E7FF);
+        textColor = const Color(0xFF4338CA);
+      case LivestockStatus.istirahat:
+        bgColor = const Color(0xFFF3F4F6);
+        textColor = const Color(0xFF6B7280);
+      case LivestockStatus.sold:
+        bgColor = const Color(0xFFE5E7EB);
+        textColor = const Color(0xFF374151);
+      case LivestockStatus.deceased:
+        bgColor = const Color(0xFFFEE2E2);
+        textColor = const Color(0xFFB91C1C);
+      case LivestockStatus.culled:
+        bgColor = const Color(0xFFFED7AA);
+        textColor = const Color(0xFFC2410C);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        status.displayName,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textColor),
       ),
     );
   }

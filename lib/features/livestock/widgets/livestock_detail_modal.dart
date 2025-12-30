@@ -26,21 +26,39 @@ void showLivestockDetailModal(
   WidgetRef ref, 
   Livestock livestock,
 ) {
-  showModalBottomSheet(
+  showGeneralDialog(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => _LivestockDetailModal(
-      livestock: livestock,
-      onDelete: () async {
-        Navigator.pop(context);
-        await _confirmDelete(context, ref, livestock);
-      },
-      onEdit: () {
-        Navigator.pop(context);
-        // TODO: Navigate to edit screen
-      },
-    ),
+    barrierDismissible: true,
+    barrierLabel: 'Livestock Detail',
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Material(
+          color: Colors.transparent,
+          child: _LivestockDetailPanel(
+            livestock: livestock,
+            onDelete: () async {
+              Navigator.pop(context);
+              await _confirmDelete(context, ref, livestock);
+            },
+            onEdit: () {
+              Navigator.pop(context);
+              // TODO: Navigate to edit screen
+            },
+          ),
+        ),
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final slideAnimation = Tween<Offset>(
+        begin: const Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+      
+      return SlideTransition(position: slideAnimation, child: child);
+    },
   );
 }
 
@@ -78,22 +96,22 @@ Future<void> _confirmDelete(
   }
 }
 
-class _LivestockDetailModal extends StatefulWidget {
+class _LivestockDetailPanel extends StatefulWidget {
   final Livestock livestock;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
 
-  const _LivestockDetailModal({
+  const _LivestockDetailPanel({
     required this.livestock,
     required this.onDelete,
     required this.onEdit,
   });
 
   @override
-  State<_LivestockDetailModal> createState() => _LivestockDetailModalState();
+  State<_LivestockDetailPanel> createState() => _LivestockDetailPanelState();
 }
 
-class _LivestockDetailModalState extends State<_LivestockDetailModal> 
+class _LivestockDetailPanelState extends State<_LivestockDetailPanel> 
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late int _tabCount;
@@ -307,31 +325,53 @@ class _LivestockDetailModalState extends State<_LivestockDetailModal>
     final genderColor = livestock.isFemale 
         ? const Color(0xFFE91E63) 
         : const Color(0xFF2196F3);
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Panel width: 400px on desktop, 85% on mobile
+    final panelWidth = screenWidth > 600 ? 500.0 : screenWidth * 0.9;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.85,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 8),
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(2),
+    return Container(
+      width: panelWidth,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(40),
+            blurRadius: 20,
+            offset: const Offset(-4, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Close button row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Detail Ternak',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[500],
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 22),
+                  onPressed: () => Navigator.pop(context),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.grey[100],
+                    padding: const EdgeInsets.all(6),
+                  ),
+                ),
+              ],
             ),
-            // Header
+          ),
+          // Header
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -454,7 +494,6 @@ class _LivestockDetailModalState extends State<_LivestockDetailModal>
                   _InformasiTab(livestock: livestock),
                   _PertumbuhanTab(livestock: livestock),
                   _KesehatanTab(livestock: livestock),
-                  // Breeding tab only for females
                   if (livestock.isFemale)
                     _BreedingTab(livestock: livestock),
                 ],
@@ -462,7 +501,6 @@ class _LivestockDetailModalState extends State<_LivestockDetailModal>
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -795,9 +833,31 @@ class _InformasiTab extends ConsumerWidget {
                   ],
                 ),
               ),
-              _InfoRow(
-                label: 'Kesehatan',
-                value: 'Sehat', // TODO: Sync with health records
+              // Get health status from health records
+              Consumer(
+                builder: (context, ref, _) {
+                  final healthAsync = ref.watch(healthByLivestockProvider(livestock.id));
+                  return healthAsync.when(
+                    loading: () => _InfoRow(label: 'Kesehatan', value: '...'),
+                    error: (_, __) => _InfoRow(label: 'Kesehatan', value: 'Sehat'),
+                    data: (records) {
+                      if (records.isNotEmpty) {
+                        // Check if there are active illness records (within last 30 days)
+                        final recentIllness = records.where((r) => 
+                          r.type == HealthRecordType.illness &&
+                          DateTime.now().difference(r.recordDate).inDays <= 30
+                        ).toList();
+                        if (recentIllness.isNotEmpty) {
+                          return _InfoRow(
+                            label: 'Kesehatan', 
+                            value: '⚠️ ${recentIllness.first.title}',
+                          );
+                        }
+                      }
+                      return _InfoRow(label: 'Kesehatan', value: 'Sehat');
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -2599,6 +2659,16 @@ class _BreedingTab extends ConsumerWidget {
     }
   }
 
+  /// Get minimum breeding date (birth date + 4 months)
+  DateTime _getMinimumBreedingDate() {
+    if (livestock.birthDate == null) return DateTime(2020);
+    // Minimum breeding age is 4 months (120 days)
+    final minBreedingDate = livestock.birthDate!.add(const Duration(days: minBreedingAgeDays));
+    // Ensure the date is not in the future
+    final today = DateTime.now();
+    return minBreedingDate.isAfter(today) ? today : minBreedingDate;
+  }
+
   String _formatDate(DateTime date) {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
@@ -2653,8 +2723,8 @@ class _BreedingTab extends ConsumerWidget {
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: matingDate,
-                          firstDate: livestock.birthDate ?? DateTime(2020),
+                          initialDate: matingDate.isBefore(_getMinimumBreedingDate()) ? _getMinimumBreedingDate() : matingDate,
+                          firstDate: _getMinimumBreedingDate(),
                           lastDate: DateTime.now(),
                         );
                         if (picked != null) setState(() => matingDate = picked);
