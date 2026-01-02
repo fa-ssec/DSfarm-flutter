@@ -24,18 +24,11 @@ class OffspringListScreen extends ConsumerStatefulWidget {
 
 class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
   final MenuController _menuController = MenuController();
-  final TextEditingController _searchController = TextEditingController(); // Search controller
   
-  String _searchQuery = '';
   Set<OffspringStatus> _selectedStatuses = {}; // Default empty = Active Only (implicit)
   Set<Gender> _selectedGenders = {};
   bool _isGridView = true;
-  
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -52,11 +45,6 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
           var filtered = offsprings.where((o) {
             final effective = o.effectiveStatus;
             
-            final matchesSearch = _searchQuery.isEmpty || 
-                o.code.toLowerCase().contains(_searchQuery.toLowerCase()) || 
-                (o.name != null && o.name!.toLowerCase().contains(_searchQuery.toLowerCase())) ||
-                (o.damCode != null && o.damCode!.toLowerCase().contains(_searchQuery.toLowerCase()));
-            
             final matchesGender = _selectedGenders.isEmpty || _selectedGenders.contains(o.gender);
             
             // Status Logic: Empty = Active Only. Selected = Explicit Match.
@@ -64,10 +52,19 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
                 ? effective.isActive 
                 : _selectedStatuses.contains(effective);
                 
-            return matchesSearch && matchesGender && matchesStatus;
+            return matchesGender && matchesStatus;
           }).toList();
           
           final totalActive = _selectedStatuses.length + _selectedGenders.length;
+
+          // Calculate stats
+          final allCount = offsprings.length;
+          final activeCount = offsprings.where((o) => o.effectiveStatus.isActive).length;
+          final soldCount = offsprings.where((o) => o.effectiveStatus == OffspringStatus.sold).length;
+          final deceasedCount = offsprings.where((o) => o.effectiveStatus == OffspringStatus.deceased).length;
+          final promotedCount = offsprings.where((o) => o.effectiveStatus == OffspringStatus.promoted).length;
+          final exitedCount = soldCount + deceasedCount + promotedCount;
+
 
           return Column(
             children: [
@@ -79,55 +76,203 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title and Add Button
+                    // ═══════════════════════════════════════════
+                    // STAT CARDS ROW
+                    // ═══════════════════════════════════════════
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Anakan', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 4),
-                            Text('${filtered.length} ekor ditampilkan', style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
-                          ],
+                        // Di Farm Card
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () => setState(() => _selectedStatuses.clear()),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text('DI FARM', style: TextStyle(fontSize: 12, color: Colors.green[600], fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                                          Icon(Icons.home_rounded, color: Colors.green[400], size: 24),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                                        textBaseline: TextBaseline.alphabetic,
+                                        children: [
+                                          Text('$activeCount', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+                                          const SizedBox(width: 6),
+                                          Text('Ekor', style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text('Active offspring', style: TextStyle(fontSize: 12, color: Colors.green[500])),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                        ElevatedButton.icon(
-                          onPressed: () => _showAddOptions(context),
-                          icon: const Icon(Icons.add, size: 18),
-                          label: const Text('Jual Batch'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        const SizedBox(width: 16),
+                        // Keluar Card
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () => setState(() => _selectedStatuses = {OffspringStatus.sold, OffspringStatus.deceased, OffspringStatus.promoted}),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text('KELUAR', style: TextStyle(fontSize: 12, color: Colors.orange[600], fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                                          Icon(Icons.exit_to_app_rounded, color: Colors.orange[400], size: 24),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                                        textBaseline: TextBaseline.alphabetic,
+                                        children: [
+                                          Text('$exitedCount', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+                                          const SizedBox(width: 6),
+                                          Text('Ekor', style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 4,
+                                        children: [
+                                          Text('Terjual: $soldCount', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                                          Text('|', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                                          Text('Mati: $deceasedCount', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Total Card
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () => setState(() => _selectedStatuses = OffspringStatus.values.toSet()),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text('TOTAL', style: TextStyle(fontSize: 12, color: Colors.blue[600], fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                                          Icon(Icons.access_time_rounded, color: Colors.blue[400], size: 24),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                                        textBaseline: TextBaseline.alphabetic,
+                                        children: [
+                                          Text('$allCount', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+                                          const SizedBox(width: 6),
+                                          Text('Record', style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant)),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text('All time history', style: TextStyle(fontSize: 12, color: Colors.blue[500])),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    
-                    // Toolbar (Search + Filter + Toggle)
+                    const SizedBox(height: 16),
+
+                    // ═══════════════════════════════════════════
+                    // CONTROLS ROW: View Toggle | Filter | Buttons
+                    // ═══════════════════════════════════════════
                     Row(
                       children: [
-                        // Search Bar
-                        Expanded(
-                          child: TextField(
-                             controller: _searchController,
-                            decoration: InputDecoration(
-                              hintText: 'Cari ID, nama, atau induk...',
-                              prefixIcon: const Icon(Icons.search),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5))),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5))),
-                              filled: true,
-                              fillColor: colorScheme.surface,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            ),
-                            onChanged: (value) => setState(() => _searchQuery = value),
+                        // View toggle
+                        Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _ViewToggle(
+                                icon: Icons.grid_view_rounded,
+                                isSelected: _isGridView,
+                                onTap: () => setState(() => _isGridView = true),
+                              ),
+                              _ViewToggle(
+                                icon: Icons.view_list_rounded,
+                                isSelected: !_isGridView,
+                                onTap: () => setState(() => _isGridView = false),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        
-                        // Filter Button (MenuAnchor)
+                        const SizedBox(width: 8),
+                        // Filter Button
                         MenuAnchor(
                           controller: _menuController,
                           alignmentOffset: const Offset(0, 8),
@@ -167,27 +312,17 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(width: 12),
-                        
-                        // View Toggle
-                        Container(
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              _ViewToggle(
-                                icon: Icons.grid_view_rounded,
-                                isSelected: _isGridView,
-                                onTap: () => setState(() => _isGridView = true),
-                              ),
-                              _ViewToggle(
-                                icon: Icons.view_list_rounded,
-                                isSelected: !_isGridView,
-                                onTap: () => setState(() => _isGridView = false),
-                              ),
-                            ],
+                        const Spacer(),
+                        // Jual Batch Button
+                        ElevatedButton.icon(
+                          onPressed: () => _showAddOptions(context),
+                          icon: const Icon(Icons.sell_outlined, size: 18),
+                          label: const Text('Jual Batch'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ],
@@ -214,7 +349,7 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
   }
 
   void _showAddOptions(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const BatchSellScreen()));
+    showBatchSellPanel(context);
   }
 
   Widget _buildGridView(BuildContext context, List<Offspring> filtered) {
@@ -227,11 +362,11 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
         
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.4,
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 240, // Same as livestock
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.0, // Adjusted to prevent overflow
           ),
           itemCount: filtered.length,
           itemBuilder: (context, index) => _OffspringCard(
@@ -244,37 +379,81 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
   }
 
   Widget _buildListView(BuildContext context, List<Offspring> filtered) {
-    return Column(
-      children: [
-        // Table Header
-        Container(
-          color: const Color(0xFFF9FAFB),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(flex: 2, child: Text('ID', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant))),
-              // Expanded(flex: 2, child: Text('INDUK', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant))),
-              Expanded(flex: 1, child: Text('KELAMIN', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant))),
-              Expanded(flex: 2, child: Text('UMUR', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant))),
-              Expanded(flex: 2, child: Text('BERAT', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant))),
-              Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant))),
-              // const SizedBox(width: 24), // Chevron spacer
-            ],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        ),
-        const Divider(height: 1, color: Color(0xFFE5E7EB)),
-        // Table Body
-        Expanded(
-          child: ListView.separated(
-            itemCount: filtered.length,
-            separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF3F4F6)),
-            itemBuilder: (context, index) => _OffspringListItem(
-              offspring: filtered[index],
-              onTap: () => showOffspringDetailModal(context, ref, filtered[index]),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          // Table Header
+          Container(
+            color: const Color(0xFFF9FAFB),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'ID ANAKAN', 
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Text(
+                    'KELAMIN', 
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'UMUR', 
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'BERAT', 
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'STATUS', 
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          // Table Body
+          Expanded(
+            child: ListView.separated(
+              itemCount: filtered.length,
+              separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF3F4F6)),
+              itemBuilder: (context, index) => _OffspringListItem(
+                offspring: filtered[index],
+                onTap: () => showOffspringDetailModal(context, ref, filtered[index]),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -615,35 +794,46 @@ class _OffspringCard extends ConsumerWidget {
       orElse: () => '-',
     );
 
-    return Card(
-      margin: EdgeInsets.zero,
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header: Gender icon + Code + Badge + Status
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Gender icon
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: genderBgColor,
-                      borderRadius: BorderRadius.circular(10),
+                      shape: BoxShape.circle,
                     ),
                     child: Center(
                       child: Text(
                         offspring.genderIcon,
-                        style: TextStyle(fontSize: 20, color: genderColor, fontWeight: FontWeight.w600),
+                        style: TextStyle(fontSize: 16, color: genderColor, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   // Code and Status
                   Expanded(
                     child: Column(
@@ -651,46 +841,53 @@ class _OffspringCard extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              offspring.code,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: colorScheme.onSurface,
+                            Flexible(
+                              child: Text(
+                                offspring.code,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: colorScheme.onSurface,
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isNew) ...[
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF10B981),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: const Text(
                                   'BARU',
-                                  style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                                  style: TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ],
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         _StatusBadge(status: offspring.effectiveStatus),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              // Details in table-like rows
-              _buildDetailRow(context, 'Induk', offspring.damCode ?? '-', null),
-              const SizedBox(height: 4),
-              _buildDetailRow(context, 'Umur', offspring.ageFormatted, null),
-              const SizedBox(height: 4),
-              _buildDetailRow(context, 'Berat', offspring.weight != null ? '${offspring.weight} kg' : '-', null),
-              const SizedBox(height: 4),
-              _buildDetailRow(context, 'Kesehatan', latestHealthTitle, Colors.orange[700]),
+              const SizedBox(height: 8),
+              // Details in table-like rows - wrapped in Expanded to fill remaining space
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildDetailRow(context, 'Induk', offspring.damCode ?? '-', null),
+                    _buildDetailRow(context, 'Umur', offspring.ageFormatted, null),
+                    _buildDetailRow(context, 'Berat', offspring.weight != null ? '${offspring.weight} kg' : '-', null),
+                    _buildDetailRow(context, 'Kesehatan', latestHealthTitle, Colors.orange[700]),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

@@ -17,11 +17,13 @@ import '../../../models/livestock.dart';
 import '../../../models/weight_record.dart';
 import '../../../providers/breeding_provider.dart';
 import '../../../providers/farm_provider.dart';
+import '../../../providers/finance_provider.dart';
 import '../../../providers/health_provider.dart';
 import '../../../providers/livestock_provider.dart';
 import '../../../providers/offspring_provider.dart';
 import '../../../providers/weight_record_provider.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../screens/create_livestock_screen.dart';
 
 /// Helper function to show livestock detail modal
 void showLivestockDetailModal(
@@ -43,12 +45,74 @@ void showLivestockDetailModal(
           child: _LivestockDetailPanel(
             livestock: livestock,
             onDelete: () async {
-              Navigator.pop(context);
-              await _confirmDelete(context, ref, livestock);
+              // Show confirmation dialog first (panel stays open)
+              final shouldDelete = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Hapus Indukan?'),
+                  content: Text('Apakah Anda yakin ingin menghapus ${livestock.displayName}?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Batal'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      child: const Text('Hapus'),
+                    ),
+                  ],
+                ),
+              );
+              
+              if (shouldDelete == true && context.mounted) {
+                Navigator.pop(context); // Close the detail panel
+                
+                // Flag to track if deletion was cancelled
+                bool undoPressed = false;
+                
+                // Show SnackBar with Undo action for 5 seconds
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${livestock.displayName} akan dihapus...'),
+                    duration: const Duration(seconds: 5),
+                    action: SnackBarAction(
+                      label: 'URUNGKAN',
+                      textColor: Colors.yellow,
+                      onPressed: () {
+                        undoPressed = true;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${livestock.displayName} tidak jadi dihapus'),
+                            backgroundColor: Colors.green,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ).closed.then((reason) async {
+                  // Only delete if undo was NOT pressed
+                  if (!undoPressed && reason != SnackBarClosedReason.action) {
+                    try {
+                      await ref.read(livestockNotifierProvider.notifier).delete(livestock.id);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Gagal menghapus: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  }
+                });
+              }
             },
             onEdit: () {
               Navigator.pop(context);
-              // TODO: Navigate to edit screen
+              showEditLivestockPanel(context, livestock);
             },
           ),
         ),
@@ -99,7 +163,7 @@ Future<void> _confirmDelete(
   }
 }
 
-class _LivestockDetailPanel extends StatefulWidget {
+class _LivestockDetailPanel extends ConsumerStatefulWidget {
   final Livestock livestock;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
@@ -111,10 +175,10 @@ class _LivestockDetailPanel extends StatefulWidget {
   });
 
   @override
-  State<_LivestockDetailPanel> createState() => _LivestockDetailPanelState();
+  ConsumerState<_LivestockDetailPanel> createState() => _LivestockDetailPanelState();
 }
 
-class _LivestockDetailPanelState extends State<_LivestockDetailPanel> 
+class _LivestockDetailPanelState extends ConsumerState<_LivestockDetailPanel> 
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late int _tabCount;
@@ -135,98 +199,246 @@ class _LivestockDetailPanelState extends State<_LivestockDetailPanel>
 
   void _showSellDialog(BuildContext context) {
     final priceController = TextEditingController();
-    DateTime? sellDate = DateTime.now();
+    final buyerNameController = TextEditingController();
+    final buyerContactController = TextEditingController();
+    final notesController = TextEditingController();
+    DateTime sellDate = DateTime.now();
+    bool isLoading = false;
     
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Jual Indukan'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Jual ${widget.livestock.code}?',
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          final colorScheme = Theme.of(context).colorScheme;
+          
+          return Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: priceController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [ThousandsSeparatorInputFormatter()],
-                decoration: const InputDecoration(
-                  labelText: 'Harga Jual *',
-                  prefixText: 'Rp ',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: sellDate ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime.now(),
-                  );
-                  if (picked != null) {
-                    setDialogState(() => sellDate = picked);
-                  }
-                },
-                child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Tanggal Jual *',
-                    border: OutlineInputBorder(),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        sellDate != null 
-                            ? '${sellDate!.day}/${sellDate!.month}/${sellDate!.year}'
-                            : 'Pilih tanggal',
+                      // Handle bar
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: colorScheme.outlineVariant,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                       ),
-                      const Icon(Icons.calendar_today, size: 18),
+                      const SizedBox(height: 16),
+                      
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withAlpha(20),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.sell, color: Color(0xFF10B981), size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Jual Indukan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                Text(widget.livestock.code, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Price field
+                      TextField(
+                        controller: priceController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [ThousandsSeparatorInputFormatter()],
+                        decoration: InputDecoration(
+                          labelText: 'Harga Jual *',
+                          prefixText: 'Rp ',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Date picker
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: sellDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setSheetState(() => sellDate = picked);
+                          }
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'Tanggal Jual',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('${sellDate.day}/${sellDate.month}/${sellDate.year}'),
+                              const Icon(Icons.calendar_today, size: 18),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // Buyer info section
+                      Text('Informasi Pembeli', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
+                      const SizedBox(height: 8),
+                      
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: buyerNameController,
+                              decoration: InputDecoration(
+                                labelText: 'Pembeli',
+                                isDense: true,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextField(
+                              controller: buyerContactController,
+                              keyboardType: TextInputType.phone,
+                              decoration: InputDecoration(
+                                labelText: 'Kontak',
+                                isDense: true,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      
+                      TextField(
+                        controller: notesController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Catatan (opsional)',
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      // Submit button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: isLoading ? null : () async {
+                            if (priceController.text.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Masukkan harga jual')),
+                              );
+                              return;
+                            }
+                            
+                            setSheetState(() => isLoading = true);
+                            
+                            try {
+                              final priceString = priceController.text.replaceAll('.', '');
+                              final price = double.tryParse(priceString) ?? 0;
+                              
+                              final descParts = <String>['Penjualan indukan ${widget.livestock.code}'];
+                              if (buyerNameController.text.isNotEmpty) {
+                                descParts.add('Pembeli: ${buyerNameController.text}');
+                              }
+                              if (buyerContactController.text.isNotEmpty) {
+                                descParts.add('Kontak: ${buyerContactController.text}');
+                              }
+                              if (notesController.text.isNotEmpty) {
+                                descParts.add('Catatan: ${notesController.text}');
+                              }
+                              
+                              print('DEBUG: Attempting to sell livestock ${widget.livestock.id}');
+                              print('DEBUG: Price: $price, Date: $sellDate');
+                              
+                              await ref.read(livestockNotifierProvider.notifier).sellLivestock(
+                                livestockId: widget.livestock.id,
+                                salePrice: price,
+                                saleDate: sellDate,
+                                description: descParts.join(' | '),
+                              );
+                              
+                              print('DEBUG: sellLivestock completed successfully');
+                              
+                              // Refresh finance provider so finance list updates
+                              await ref.read(financeNotifierProvider.notifier).loadTransactions();
+                              
+                              if (context.mounted) {
+                                Navigator.pop(bottomSheetContext);
+                                Navigator.pop(context); // Close detail panel
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('${widget.livestock.code} terjual - Rp ${priceController.text}'),
+                                    backgroundColor: const Color(0xFF10B981),
+                                  ),
+                                );
+                              }
+                            } catch (e, stack) {
+                              print('DEBUG: sellLivestock FAILED: $e');
+                              print('DEBUG: Stack trace: $stack');
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Gagal: $e'), backgroundColor: Colors.red),
+                                );
+                              }
+                            } finally {
+                              if (context.mounted) setSheetState(() => isLoading = false);
+                            }
+                          },
+                          icon: isLoading
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.sell, size: 18),
+                          label: Text(isLoading ? 'Menjual...' : 'Jual Sekarang'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Batal'),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                if (priceController.text.isEmpty || sellDate == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Lengkapi semua data')),
-                  );
-                  return;
-                }
-                
-                Navigator.pop(dialogContext);
-                Navigator.pop(context); // Close detail panel
-                
-                // Update livestock status to sold
-                // Note: This requires updating the notifier to support status change
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${widget.livestock.code} berhasil dijual dengan harga Rp ${priceController.text}'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-              ),
-              child: const Text('Jual'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -519,7 +731,6 @@ class _LivestockDetailPanelState extends State<_LivestockDetailPanel>
                     icon: const Icon(Icons.edit_outlined),
                     onPressed: widget.onEdit,
                   ),
-
                   IconButton(
                     icon: const Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: widget.onDelete,
@@ -735,9 +946,9 @@ class _InformasiTab extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Informasi Dasar
+          // Biometrik
           _SectionCard(
-            title: 'Informasi Dasar',
+            title: 'Biometrik',
             children: [
               _InfoRow(
                 label: 'Jenis Kelamin',
@@ -793,7 +1004,6 @@ class _InformasiTab extends ConsumerWidget {
                               : '-',
                         );
                       }
-                      // Records are sorted descending, so first = latest
                       final latestWeight = records.first.weight;
                       return _InfoRow(
                         label: 'Berat',
@@ -803,38 +1013,17 @@ class _InformasiTab extends ConsumerWidget {
                   );
                 },
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Lokasi & Status
+          _SectionCard(
+            title: 'Lokasi & Status',
+            children: [
               _InfoRow(
                 label: 'Kandang',
                 value: livestock.housingCode ?? '-',
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Informasi Akuisisi
-          _SectionCard(
-            title: 'Informasi Akuisisi',
-            children: [
-              _InfoRow(
-                label: 'Sumber',
-                value: livestock.acquisitionType.displayName,
-              ),
-              if (livestock.acquisitionType == AcquisitionType.purchased) ...[
-                _InfoRow(
-                  label: 'Harga',
-                  value: _formatCurrency(livestock.purchasePrice),
-                ),
-                _InfoRow(
-                  label: 'Tanggal',
-                  value: _formatDate(livestock.acquisitionDate),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Status
-          _SectionCard(
-            title: 'Status',
-            children: [
               // Status Kelinci dropdown
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
@@ -964,6 +1153,27 @@ class _InformasiTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 12),
+          // Akuisisi (only show if purchased)
+          if (livestock.acquisitionType == AcquisitionType.purchased)
+            _SectionCard(
+              title: 'Akuisisi',
+              children: [
+                _InfoRow(
+                  label: 'Sumber',
+                  value: livestock.acquisitionType.displayName,
+                ),
+                _InfoRow(
+                  label: 'Harga',
+                  value: _formatCurrency(livestock.purchasePrice),
+                ),
+                _InfoRow(
+                  label: 'Tanggal',
+                  value: _formatDate(livestock.acquisitionDate),
+                ),
+              ],
+            ),
+          if (livestock.acquisitionType == AcquisitionType.purchased)
+            const SizedBox(height: 12),
           // Silsilah
           _SectionCard(
             title: 'Silsilah',

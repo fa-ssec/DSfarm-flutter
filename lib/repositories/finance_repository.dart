@@ -83,6 +83,14 @@ class FinanceRepository {
         .eq('id', id);
   }
 
+  /// Delete all transactions for a farm
+  Future<void> deleteAllTransactions(String farmId) async {
+    await SupabaseService.client
+        .from(_transactionsTable)
+        .delete()
+        .eq('farm_id', farmId);
+  }
+
   // ═══════════════════════════════════════════════════════════
   // SUMMARY
   // ═══════════════════════════════════════════════════════════
@@ -186,6 +194,31 @@ class FinanceRepository {
       name: saleCategoryName,
       type: TransactionType.income,
       icon: '🐰',
+    );
+  }
+
+  /// Get or create default sale category for livestock (indukan)
+  Future<FinanceCategory> getOrCreateLivestockSaleCategory(String farmId) async {
+    const saleCategoryName = 'Penjualan Indukan';
+    
+    // Try to find existing
+    final existing = await SupabaseService.client
+        .from(_categoriesTable)
+        .select()
+        .eq('farm_id', farmId)
+        .eq('name', saleCategoryName)
+        .maybeSingle();
+    
+    if (existing != null) {
+      return FinanceCategory.fromJson(existing);
+    }
+    
+    // Create new
+    return createCategory(
+      farmId: farmId,
+      name: saleCategoryName,
+      type: TransactionType.income,
+      icon: '🐇',
     );
   }
 }

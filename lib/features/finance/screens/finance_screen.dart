@@ -10,6 +10,8 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../../core/widgets/dashboard_shell.dart';
 import '../../../models/finance.dart';
 import '../../../providers/finance_provider.dart';
+import '../../../providers/farm_provider.dart';
+import '../../../services/finance_export_service.dart';
 
 class FinanceScreen extends ConsumerStatefulWidget {
   const FinanceScreen({super.key});
@@ -20,6 +22,8 @@ class FinanceScreen extends ConsumerStatefulWidget {
 
 class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   String _activePreset = '6M';
+  String _searchQuery = '';
+  String _categoryFilter = 'all';
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,23 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               children: [
                 Text('Keuangan', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                 const Spacer(),
+                // Export Button
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.file_download_outlined),
+                  tooltip: 'Export Laporan',
+                  onSelected: (value) => _handleExport(value, txAsync),
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(value: 'pdf', child: Row(children: [Icon(Icons.picture_as_pdf, color: Colors.red), SizedBox(width: 8), Text('Export PDF')])),
+                    const PopupMenuItem(value: 'excel', child: Row(children: [Icon(Icons.table_chart, color: Colors.green), SizedBox(width: 8), Text('Export Excel')])),
+                  ],
+                ),
+                // Delete all button
+                IconButton(
+                  icon: const Icon(Icons.delete_sweep, color: Colors.red),
+                  tooltip: 'Hapus Semua Transaksi',
+                  onPressed: () => _confirmDeleteAll(),
+                ),
+                const SizedBox(width: 8),
                 FloatingActionButton.small(
                   heroTag: 'addFinance',
                   onPressed: () => _showAddSheet(),
@@ -94,7 +115,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                       value: profit,
                       trend: profit >= 0 ? 14.4 : -5.0,
                       icon: Icons.account_balance_rounded,
-                      iconColor: const Color(0xFF8B5CF6),
+                      iconColor: const Color(0xFFF59E0B),
+                      isPremium: true,
                     ),
                   ],
                 );
@@ -149,7 +171,47 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 if (transactions.isEmpty) {
                   return _buildEmptyTransactions();
                 }
-                return _buildTransactionsTable(transactions);
+                
+                // Filter transactions safely using for loop
+                final List<FinanceTransaction> filtered = [];
+                for (final tx in transactions) {
+                  bool include = true;
+                  
+                  // Search filter
+                  if (_searchQuery.isNotEmpty) {
+                    final query = _searchQuery.toLowerCase();
+                    final cat = tx.categoryName ?? '';
+                    final desc = tx.description ?? '';
+                    if (!cat.toLowerCase().contains(query) && 
+                        !desc.toLowerCase().contains(query)) {
+                      include = false;
+                    }
+                  }
+                  
+                  // Category filter
+                  if (include && _categoryFilter == 'income' && !tx.isIncome) {
+                    include = false;
+                  }
+                  if (include && _categoryFilter == 'expense' && tx.isIncome) {
+                    include = false;
+                  }
+                  
+                  if (include) filtered.add(tx);
+                }
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Search & Filter Bar
+                    _buildSearchFilterBar(transactions),
+                    const SizedBox(height: 16),
+                    // Transactions Table
+                    if (filtered.isEmpty)
+                      _buildEmptySearch()
+                    else
+                      _buildTransactionsTable(filtered),
+                  ],
+                );
               },
             ),
             const SizedBox(height: 80),
@@ -163,6 +225,8 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   // TREND CHART CARD
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildTrendChartCard(AsyncValue<List<MonthlyTrendData>> trendAsync) {
+    final txAsync = ref.watch(financeNotifierProvider);
+    
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -178,7 +242,10 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                   children: [
                     const Text('Tren Keuangan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                     const SizedBox(height: 4),
-                    Text('Pemasukan vs Pengeluaran', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                    Text(
+                      _activePreset == '1M' ? 'Data Harian (30 hari terakhir)' : 'Pemasukan vs Pengeluaran', 
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
                   ],
                 ),
                 // Period Toggle
@@ -196,17 +263,31 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
             const SizedBox(height: 24),
             SizedBox(
               height: 250,
-              child: trendAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
-                data: (data) {
-                  final filtered = _filterTrendData(data);
-                  if (filtered.isEmpty) {
-                    return Center(child: Text('Belum ada data', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)));
-                  }
-                  return _buildLineChart(filtered);
-                },
-              ),
+              child: _activePreset == '1M'
+                  // For 1M: Use daily data from transactions
+                  ? txAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Error: $e')),
+                      data: (transactions) {
+                        final dailyData = _buildDailyTrendData(transactions);
+                        if (dailyData.isEmpty) {
+                          return Center(child: Text('Belum ada data', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)));
+                        }
+                        return _buildDailyLineChart(dailyData);
+                      },
+                    )
+                  // For 6M, 1Y: Use monthly data
+                  : trendAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Error: $e')),
+                      data: (data) {
+                        final filtered = _filterTrendData(data);
+                        if (filtered.isEmpty) {
+                          return Center(child: Text('Belum ada data', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)));
+                        }
+                        return _buildLineChart(filtered);
+                      },
+                    ),
             ),
           ],
         ),
@@ -243,6 +324,161 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
       case '1Y': return data;
       default: return data;
     }
+  }
+
+  /// Build daily trend data from transactions for 1M view
+  List<_DailyTrendData> _buildDailyTrendData(List<FinanceTransaction> transactions) {
+    final now = DateTime.now();
+    final startDate = now.subtract(const Duration(days: 30));
+    
+    // Create map for all days in the last 30 days
+    final Map<String, _DailyTrendData> dailyMap = {};
+    for (int i = 0; i <= 30; i++) {
+      final date = startDate.add(Duration(days: i));
+      final key = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final label = '${date.day}';
+      dailyMap[key] = _DailyTrendData(day: label, date: date, income: 0, expense: 0);
+    }
+    
+    // Aggregate transactions by day
+    for (final tx in transactions) {
+      final txDate = tx.transactionDate;
+      if (txDate.isBefore(startDate)) continue;
+      
+      final key = '${txDate.year}-${txDate.month.toString().padLeft(2, '0')}-${txDate.day.toString().padLeft(2, '0')}';
+      if (dailyMap.containsKey(key)) {
+        final existing = dailyMap[key]!;
+        if (tx.isIncome) {
+          dailyMap[key] = _DailyTrendData(
+            day: existing.day,
+            date: existing.date,
+            income: existing.income + tx.amount,
+            expense: existing.expense,
+          );
+        } else {
+          dailyMap[key] = _DailyTrendData(
+            day: existing.day,
+            date: existing.date,
+            income: existing.income,
+            expense: existing.expense + tx.amount,
+          );
+        }
+      }
+    }
+    
+    // Sort by date and return
+    final sortedKeys = dailyMap.keys.toList()..sort();
+    return sortedKeys.map((k) => dailyMap[k]!).toList();
+  }
+
+  Widget _buildDailyLineChart(List<_DailyTrendData> data) {
+    if (data.isEmpty) return const SizedBox();
+    
+    final maxVal = data.fold<double>(0, (m, d) => [m, d.income, d.expense].reduce((a, b) => a > b ? a : b));
+    final lastIncome = data.isNotEmpty ? data.last.income : 0.0;
+
+    return Stack(
+      children: [
+        LineChart(
+          LineChartData(
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: maxVal > 0 ? maxVal / 4 : 1000000,
+              getDrawingHorizontalLine: (v) => FlLine(
+                color: Theme.of(context).colorScheme.outlineVariant.withAlpha(60),
+                strokeWidth: 1,
+                dashArray: [5, 5],
+              ),
+            ),
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  interval: 5, // Show every 5th day
+                  getTitlesWidget: (value, meta) {
+                    final idx = value.toInt();
+                    if (idx >= 0 && idx < data.length && idx % 5 == 0) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          data[idx].day,
+                          style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
+                      );
+                    }
+                    return const SizedBox();
+                  },
+                ),
+              ),
+            ),
+            borderData: FlBorderData(show: false),
+            minY: 0,
+            maxY: maxVal > 0 ? maxVal * 1.3 : 1000000,
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                getTooltipItems: (spots) => spots.map((spot) {
+                  final idx = spot.x.toInt();
+                  final isIncome = spot.barIndex == 0;
+                  final value = spot.y;
+                  return LineTooltipItem(
+                    '${isIncome ? "Income" : "Expense"}: ${_formatCurrency(value)}',
+                    TextStyle(color: isIncome ? const Color(0xFF4CAF50) : const Color(0xFFEF4444), fontSize: 12),
+                  );
+                }).toList(),
+              ),
+            ),
+            lineBarsData: [
+              // Income line
+              LineChartBarData(
+                spots: List.generate(data.length, (i) => FlSpot(i.toDouble(), data[i].income)),
+                isCurved: true,
+                color: const Color(0xFF4CAF50),
+                barWidth: 2,
+                isStrokeCapRound: true,
+                dotData: const FlDotData(show: false),
+                belowBarData: BarAreaData(
+                  show: true,
+                  gradient: LinearGradient(
+                    colors: [const Color(0xFF4CAF50).withAlpha(80), const Color(0xFF4CAF50).withAlpha(10)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+              // Expense line
+              LineChartBarData(
+                spots: List.generate(data.length, (i) => FlSpot(i.toDouble(), data[i].expense)),
+                isCurved: true,
+                color: const Color(0xFF64B5F6),
+                barWidth: 2,
+                isStrokeCapRound: true,
+                dotData: const FlDotData(show: false),
+                dashArray: [5, 5],
+              ),
+            ],
+          ),
+        ),
+        // Value badge
+        if (lastIncome > 0)
+          Positioned(
+            right: 0,
+            top: 40,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+              ),
+              child: Text(_formatCurrency(lastIncome), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildLineChart(List<MonthlyTrendData> data) {
@@ -531,6 +767,101 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // SEARCH & FILTER BAR
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildSearchFilterBar(List<FinanceTransaction> allTransactions) {
+    final thisWeek = allTransactions.where((tx) {
+      final diff = DateTime.now().difference(tx.transactionDate).inDays;
+      return diff <= 7;
+    }).toList();
+    final weekTotal = thisWeek.fold<double>(0, (s, t) => s + (t.isIncome ? t.amount : -t.amount));
+    
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Quick Stats Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF059669).withAlpha(15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.insights_rounded, size: 18, color: Color(0xFF059669)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${thisWeek.length} transaksi minggu ini',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Total: ${_formatCurrency(weekTotal.abs())}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: weekTotal >= 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Search & Filter Row
+            Row(
+              children: [
+                // Search Input
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    decoration: InputDecoration(
+                      hintText: 'Cari transaksi...',
+                      hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(150)),
+                      prefixIcon: Icon(Icons.search, size: 20, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(100),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Category Filter
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(100),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _categoryFilter,
+                      icon: const Icon(Icons.keyboard_arrow_down),
+                      onChanged: (v) => setState(() => _categoryFilter = v ?? 'all'),
+                      items: const [
+                        DropdownMenuItem(value: 'all', child: Text('Semua')),
+                        DropdownMenuItem(value: 'income', child: Text('Pemasukan')),
+                        DropdownMenuItem(value: 'expense', child: Text('Pengeluaran')),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // TRANSACTIONS TABLE
   // ═══════════════════════════════════════════════════════════════════════════
   Widget _buildEmptyTransactions() {
@@ -552,6 +883,27 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
     );
   }
 
+  Widget _buildEmptySearch() {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: SizedBox(
+        height: 120,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_off_rounded, size: 40, color: Theme.of(context).colorScheme.outlineVariant),
+              const SizedBox(height: 8),
+              Text('Tidak ada hasil', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 4),
+              Text('Coba kata kunci lain', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(150))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTransactionsTable(List<FinanceTransaction> transactions) {
     return Card(
       margin: EdgeInsets.zero,
@@ -565,7 +917,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               children: [
                 const Text('Transaksi Terbaru', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () => _showAllTransactions(transactions),
                   child: Row(
                     children: [
                       Text('Lihat Semua', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary)),
@@ -601,7 +953,11 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   Widget _buildTransactionRow(FinanceTransaction tx) {
     final isIncome = tx.isIncome;
     final color = isIncome ? const Color(0xFF10B981) : const Color(0xFFEF4444);
-    final shortId = '#TRX-${tx.id.substring(0, 4).toUpperCase()}';
+    // Format: IN-YYMM-XXXX or EX-YYMM-XXXX
+    final prefix = isIncome ? 'IN' : 'EX';
+    final yearMonth = '${tx.transactionDate.year.toString().substring(2)}${tx.transactionDate.month.toString().padLeft(2, '0')}';
+    final hash = tx.id.substring(0, 4).toUpperCase();
+    final shortId = '$prefix-$yearMonth-$hash';
 
     return InkWell(
       onTap: () => _showTransactionDetail(tx),
@@ -678,6 +1034,96 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                 textAlign: TextAlign.right,
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: color),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VIEW ALL TRANSACTIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  void _showAllTransactions(List<FinanceTransaction> transactions) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            // Handle bar
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.receipt_long, color: Color(0xFF4CAF50)),
+                  const SizedBox(width: 12),
+                  Text('Semua Transaksi (${transactions.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Transaction list
+            Expanded(
+              child: transactions.isEmpty
+                  ? const Center(child: Text('Belum ada transaksi'))
+                  : ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: transactions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1, indent: 20, endIndent: 20),
+                      itemBuilder: (context, index) {
+                        final tx = transactions[index];
+                        final isIncome = tx.isIncome;
+                        final color = isIncome ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+                        return ListTile(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _showTransactionDetail(tx);
+                          },
+                          leading: Container(
+                            width: 40, height: 40,
+                            decoration: BoxDecoration(
+                              color: color.withAlpha(25),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isIncome ? Icons.arrow_upward : Icons.arrow_downward,
+                              color: color,
+                              size: 20,
+                            ),
+                          ),
+                          title: Text(tx.categoryName ?? 'Transaksi', style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Text(_formatDate(tx.transactionDate), style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                          trailing: Text(
+                            '${isIncome ? '+' : '-'}${_formatCurrency(tx.amount)}',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: color),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -771,6 +1217,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   }
 
   void _confirmDelete(FinanceTransaction tx, BuildContext ctx) {
+    print('DEBUG _confirmDelete: Called for transaction ${tx.id}');
     showDialog(
       context: ctx,
       builder: (dialogCtx) => AlertDialog(
@@ -780,19 +1227,97 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Batal')),
           ElevatedButton(
             onPressed: () async {
+              print('DEBUG _confirmDelete: User confirmed delete for ${tx.id}');
               Navigator.pop(dialogCtx);
               Navigator.pop(ctx);
               try {
+                print('DEBUG _confirmDelete: Calling delete...');
                 await ref.read(financeNotifierProvider.notifier).delete(tx.id);
-                ref.invalidate(financeNotifierProvider);
-                ref.invalidate(monthlyTrendProvider);
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transaksi dihapus'), backgroundColor: Colors.orange));
+                print('DEBUG _confirmDelete: Delete complete, refreshing UI');
+                // Force rebuild by triggering setState
+                if (mounted) {
+                  ref.invalidate(financeNotifierProvider);
+                  ref.invalidate(monthlyTrendProvider);
+                  setState(() {}); // Force rebuild
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transaksi dihapus'), backgroundColor: Colors.orange));
+                }
               } catch (e) {
+                print('DEBUG _confirmDelete: ERROR - $e');
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleExport(String type, AsyncValue<List<FinanceTransaction>> txAsync) {
+    txAsync.whenData((transactions) async {
+      if (transactions.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tidak ada transaksi untuk di-export')),
+        );
+        return;
+      }
+      
+      final farm = ref.read(currentFarmProvider);
+      final farmName = farm?.name ?? 'DSFarm';
+      
+      try {
+        if (type == 'pdf') {
+          await FinanceExportService.exportToPdf(
+            transactions: transactions,
+            farmName: farmName,
+          );
+        } else if (type == 'excel') {
+          await FinanceExportService.exportToExcel(
+            transactions: transactions,
+            farmName: farmName,
+          );
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Export ${type.toUpperCase()} berhasil!')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Gagal export: $e')),
+          );
+        }
+      }
+    });
+  }
+
+  void _confirmDeleteAll() {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Hapus Semua Transaksi?'),
+        content: const Text('Yakin ingin menghapus SEMUA transaksi? Tindakan ini tidak dapat dibatalkan.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              try {
+                await ref.read(financeNotifierProvider.notifier).deleteAll();
+                if (mounted) {
+                  ref.invalidate(financeNotifierProvider);
+                  ref.invalidate(monthlyTrendProvider);
+                  setState(() {});
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Semua transaksi dihapus'), backgroundColor: Colors.orange));
+                }
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Hapus Semua'),
           ),
         ],
       ),
@@ -997,6 +1522,7 @@ class _SummaryCard extends StatelessWidget {
   final double trend;
   final IconData icon;
   final Color iconColor;
+  final bool isPremium;
 
   const _SummaryCard({
     required this.title,
@@ -1004,19 +1530,48 @@ class _SummaryCard extends StatelessWidget {
     required this.trend,
     required this.icon,
     required this.iconColor,
+    this.isPremium = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final isPositiveTrend = trend >= 0;
-    final trendColor = isPositiveTrend ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final trendColor = isPositiveTrend ? const Color(0xFF059669) : const Color(0xFFDC2626);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox(
       width: MediaQuery.of(context).size.width > 900 
           ? (MediaQuery.of(context).size.width - 260 - 48 - 48) / 4 
           : (MediaQuery.of(context).size.width - 48 - 16) / 2,
-      child: Card(
-        margin: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: isPremium 
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isDark 
+                      ? [const Color(0xFF291F00), const Color(0xFF1A1400)]
+                      : [const Color(0xFFFFFBEB), const Color(0xFFFEF3C7)],
+                )
+              : null,
+          color: isPremium ? null : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isPremium 
+                ? const Color(0xFFF59E0B).withAlpha(80)
+                : Theme.of(context).colorScheme.outlineVariant.withAlpha(40),
+            width: isPremium ? 1.5 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isPremium 
+                  ? const Color(0xFFF59E0B).withAlpha(20)
+                  : Colors.black.withAlpha(8),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -1032,7 +1587,9 @@ class _SummaryCard extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 0.5,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: isPremium 
+                            ? const Color(0xFFD97706)
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -1101,4 +1658,19 @@ class _SummaryCard extends StatelessWidget {
     }
     return 'Rp ${v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
   }
+}
+
+/// Helper class for daily trend data
+class _DailyTrendData {
+  final String day;
+  final DateTime date;
+  final double income;
+  final double expense;
+  
+  const _DailyTrendData({
+    required this.day,
+    required this.date,
+    required this.income,
+    required this.expense,
+  });
 }

@@ -16,30 +16,48 @@ import '../../../providers/health_provider.dart';
 import '../../../providers/offspring_provider.dart';
 import '../../../providers/weight_record_provider.dart';
 
-/// Helper function to show offspring detail modal
+/// Helper function to show offspring detail modal (from the side like Indukan)
 void showOffspringDetailModal(
   BuildContext context, 
   WidgetRef ref, 
   Offspring offspring,
 ) {
-  showModalBottomSheet(
+  showGeneralDialog(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => _OffspringDetailModal(offspring: offspring),
+    barrierDismissible: true,
+    barrierLabel: 'Offspring Detail',
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Material(
+          color: Colors.transparent,
+          child: _OffspringDetailPanel(offspring: offspring),
+        ),
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final slideAnimation = Tween<Offset>(
+        begin: const Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+      
+      return SlideTransition(position: slideAnimation, child: child);
+    },
   );
 }
 
-class _OffspringDetailModal extends ConsumerStatefulWidget {
+class _OffspringDetailPanel extends ConsumerStatefulWidget {
   final Offspring offspring;
 
-  const _OffspringDetailModal({required this.offspring});
+  const _OffspringDetailPanel({required this.offspring});
 
   @override
-  ConsumerState<_OffspringDetailModal> createState() => _OffspringDetailModalState();
+  ConsumerState<_OffspringDetailPanel> createState() => _OffspringDetailPanelState();
 }
 
-class _OffspringDetailModalState extends ConsumerState<_OffspringDetailModal> 
+class _OffspringDetailPanelState extends ConsumerState<_OffspringDetailPanel> 
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -249,139 +267,266 @@ class _OffspringDetailModalState extends ConsumerState<_OffspringDetailModal>
     final genderColor = offspring.gender == Gender.male 
         ? const Color(0xFF2196F3) 
         : const Color(0xFFE91E63);
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Panel width: 600px on desktop, 95% on mobile (same as Indukan)
+    final panelWidth = screenWidth > 600 ? 600.0 : screenWidth * 0.95;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.85,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Handle bar
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 8),
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(2),
+    return Container(
+      width: panelWidth,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.horizontal(left: Radius.circular(16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(40),
+            blurRadius: 20,
+            offset: const Offset(-4, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Close button row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Detail Anakan',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[500],
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 22),
+                  onPressed: () => Navigator.pop(context),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.grey[100],
+                    padding: const EdgeInsets.all(6),
+                  ),
+                ),
+              ],
             ),
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: genderColor.withAlpha(25),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        offspring.genderIcon,
-                        style: TextStyle(
-                          fontSize: 24,
-                          color: genderColor,
-                        ),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: genderColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      offspring.genderIcon,
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: genderColor,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          offspring.displayName,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: genderColor,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        offspring.displayName,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: genderColor,
+                        ),
+                      ),
+                      Text(
+                        'Kode: ${offspring.code}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    showEditOffspringPanel(context, offspring);
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  onPressed: () async {
+                    // Show confirmation dialog first
+                    final shouldDelete = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Hapus Anakan?'),
+                        content: Text('Apakah Anda yakin ingin menghapus ${offspring.displayName}?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Batal'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                            child: const Text('Hapus'),
+                          ),
+                        ],
+                      ),
+                    );
+                    
+                    if (shouldDelete == true && context.mounted) {
+                      Navigator.pop(context); // Close the detail panel
+                      
+                      // Flag to track if deletion was cancelled
+                      bool undoPressed = false;
+                      
+                      // Show SnackBar with Undo action for 5 seconds
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${offspring.displayName} akan dihapus...'),
+                          duration: const Duration(seconds: 5),
+                          action: SnackBarAction(
+                            label: 'URUNGKAN',
+                            textColor: Colors.yellow,
+                            onPressed: () {
+                              undoPressed = true;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${offspring.displayName} tidak jadi dihapus'),
+                                  backgroundColor: Colors.green,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                        Text(
-                          'Kode: ${offspring.code}',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Tab Bar
-            Container(
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+                      ).closed.then((reason) async {
+                        // Only delete if undo was NOT pressed
+                        if (!undoPressed && reason != SnackBarClosedReason.action) {
+                          try {
+                            await ref.read(offspringNotifierProvider.notifier).delete(offspring.id);
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Gagal menghapus: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      });
+                    }
+                  },
                 ),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                labelColor: const Color(0xFF4CAF50),
-                unselectedLabelColor: Colors.grey[600],
-                indicatorColor: const Color(0xFF4CAF50),
-                indicatorWeight: 2,
-                tabs: const [
-                  Tab(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.info_outline, size: 18),
-                        SizedBox(width: 6),
-                        Text('Informasi'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.show_chart, size: 18),
-                        SizedBox(width: 6),
-                        Text('Pertumbuhan'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.favorite_border, size: 18),
-                        SizedBox(width: 6),
-                        Text('Kesehatan'),
-                      ],
-                    ),
-                  ),
-                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Tab Bar
+          Container(
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.grey[300]!, width: 1),
               ),
             ),
-            // Tab Views
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _InformasiTab(offspring: offspring),
-                  _PertumbuhanTab(offspring: offspring),
-                  _KesehatanTab(offspring: offspring),
-                ],
-              ),
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: true,
+              labelColor: const Color(0xFF4CAF50),
+              unselectedLabelColor: Colors.grey[600],
+              indicatorColor: const Color(0xFF4CAF50),
+              indicatorWeight: 2,
+              tabs: const [
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.info_outline, size: 18),
+                      SizedBox(width: 6),
+                      Text('Informasi'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.show_chart, size: 18),
+                      SizedBox(width: 6),
+                      Text('Pertumbuhan'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.favorite_border, size: 18),
+                      SizedBox(width: 6),
+                      Text('Kesehatan'),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // Tab Views
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _InformasiTab(offspring: offspring),
+                _PertumbuhanTab(offspring: offspring),
+                _KesehatanTab(offspring: offspring),
+              ],
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, Offspring offspring) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Anakan?'),
+        content: Text('Apakah Anda yakin ingin menghapus ${offspring.displayName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true && context.mounted) {
+      await ref.read(offspringNotifierProvider.notifier).delete(offspring.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${offspring.displayName} dihapus')),
+        );
+      }
+    }
   }
 }
 
@@ -519,7 +664,7 @@ class _InformasiTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Basic Info
+          // Biometrik
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -527,33 +672,10 @@ class _InformasiTab extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Informasi Dasar',
+                    'Biometrik',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   const SizedBox(height: 12),
-                  // Get health status from health_records
-                  healthRecordsAsync.when(
-                    loading: () => const _InfoRow(label: 'Kesehatan', value: '...'),
-                    error: (_, __) => const _InfoRow(label: 'Kesehatan', value: 'Sehat'),
-                    data: (records) {
-                      if (records.isNotEmpty) {
-                        // Check if there are active illness records (within last 30 days)
-                        final recentIllness = records.where((r) => 
-                          r.type == HealthRecordType.illness &&
-                          DateTime.now().difference(r.recordDate).inDays <= 30
-                        ).toList();
-                        if (recentIllness.isNotEmpty) {
-                          return _InfoRow(
-                            label: 'Kesehatan', 
-                            value: '⚠️ ${recentIllness.first.title}',
-                          );
-                        }
-                      }
-                      return const _InfoRow(label: 'Kesehatan', value: 'Sehat');
-                    },
-                  ),
-                  if (offspring.name != null)
-                    _InfoRow(label: 'Nama', value: offspring.name!),
                   _InfoRow(label: 'Jenis Kelamin', value: offspring.gender.displayName),
                   _InfoRow(label: 'Lahir', value: _formatDate(offspring.birthDate)),
                   _InfoRow(label: 'Umur', value: offspring.ageFormatted),
@@ -570,7 +692,6 @@ class _InformasiTab extends ConsumerWidget {
                     ),
                     data: (records) {
                       if (records.isNotEmpty) {
-                        // Records are sorted descending, first is latest
                         final latestWeight = records.first.weight;
                         return _InfoRow(
                           label: 'Berat', 
@@ -585,14 +706,53 @@ class _InformasiTab extends ConsumerWidget {
                       );
                     },
                   ),
-                  _InfoRow(label: 'Kandang', value: offspring.housingCode ?? '-'),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 12),
           
-          // Parents Info
+          // Lokasi & Status
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Lokasi & Status',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 12),
+                  _InfoRow(label: 'Kandang', value: offspring.housingCode ?? '-'),
+                  _InfoRow(label: 'Status', value: offspring.status.displayName),
+                  // Get health status from health_records
+                  healthRecordsAsync.when(
+                    loading: () => const _InfoRow(label: 'Kesehatan', value: '...'),
+                    error: (_, __) => const _InfoRow(label: 'Kesehatan', value: 'Sehat'),
+                    data: (records) {
+                      if (records.isNotEmpty) {
+                        final recentIllness = records.where((r) => 
+                          r.type == HealthRecordType.illness &&
+                          DateTime.now().difference(r.recordDate).inDays <= 30
+                        ).toList();
+                        if (recentIllness.isNotEmpty) {
+                          return _InfoRow(
+                            label: 'Kesehatan', 
+                            value: '⚠️ ${recentIllness.first.title}',
+                          );
+                        }
+                      }
+                      return const _InfoRow(label: 'Kesehatan', value: 'Sehat');
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // Silsilah
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -606,8 +766,6 @@ class _InformasiTab extends ConsumerWidget {
                   const SizedBox(height: 12),
                   _InfoRow(label: 'Induk', value: offspring.damCode ?? '-'),
                   _InfoRow(label: 'Pejantan', value: offspring.sireCode ?? '-'),
-                  if (offspring.breedName != null)
-                    _InfoRow(label: 'Ras', value: offspring.breedName!),
                 ],
               ),
             ),
@@ -1637,6 +1795,427 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Helper function to show edit offspring panel from side
+void showEditOffspringPanel(BuildContext context, Offspring offspring) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Edit Offspring',
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Material(
+          color: Colors.transparent,
+          child: _EditOffspringPanel(offspring: offspring),
+        ),
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final slideAnimation = Tween<Offset>(
+        begin: const Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+      
+      return SlideTransition(position: slideAnimation, child: child);
+    },
+  );
+}
+
+/// Edit Offspring Panel
+class _EditOffspringPanel extends ConsumerStatefulWidget {
+  final Offspring offspring;
+  
+  const _EditOffspringPanel({required this.offspring});
+
+  @override
+  ConsumerState<_EditOffspringPanel> createState() => _EditOffspringPanelState();
+}
+
+class _EditOffspringPanelState extends ConsumerState<_EditOffspringPanel> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _weightController;
+  late TextEditingController _notesController;
+  
+  late DateTime? _birthDate;
+  late Gender _selectedGender;
+  late OffspringStatus _selectedStatus;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    final offspring = widget.offspring;
+    _nameController = TextEditingController(text: offspring.name ?? '');
+    _weightController = TextEditingController(text: offspring.weight?.toString() ?? '');
+    _notesController = TextEditingController(text: offspring.notes ?? '');
+    _birthDate = offspring.birthDate;
+    _selectedGender = offspring.gender;
+    _selectedStatus = offspring.status;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _weightController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Pilih tanggal';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    
+    if (picked != null) {
+      setState(() => _birthDate = picked);
+    }
+  }
+
+  Future<void> _handleSubmit() async {
+    setState(() => _errorMessage = null);
+    
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final weight = _weightController.text.isEmpty 
+          ? null 
+          : double.tryParse(_weightController.text);
+      
+      // Build updated offspring object
+      final updatedOffspring = widget.offspring.copyWith(
+        name: _nameController.text.trim().isEmpty ? null : _nameController.text.trim(),
+        gender: _selectedGender,
+        birthDate: _birthDate,
+        status: _selectedStatus,
+        weight: weight,
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+      );
+      
+      await ref.read(offspringNotifierProvider.notifier).update(updatedOffspring);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${widget.offspring.displayName} berhasil diperbarui!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final offspring = widget.offspring;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final panelWidth = screenWidth > 600 ? 480.0 : screenWidth * 0.92;
+    final colorScheme = Theme.of(context).colorScheme;
+    final genderColor = offspring.gender == Gender.male 
+        ? const Color(0xFF3B82F6) 
+        : const Color(0xFFEC4899);
+
+    return Container(
+      width: panelWidth,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(40),
+            blurRadius: 30,
+            offset: const Offset(-8, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              border: Border(
+                bottom: BorderSide(color: colorScheme.outlineVariant.withAlpha(76)),
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: genderColor.withAlpha(38),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      offspring.genderIcon,
+                      style: TextStyle(fontSize: 20, color: genderColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Edit ${offspring.displayName}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Kode: ${offspring.code}',
+                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Form
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Error message
+                    if (_errorMessage != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red[200]!),
+                        ),
+                        child: Text(_errorMessage!, style: TextStyle(color: Colors.red[700])),
+                      ),
+
+                    // Name
+                    const Text('Nama (Opsional)', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.pets),
+                        border: OutlineInputBorder(),
+                        hintText: 'Contoh: Kelinci Putih',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Gender
+                    const Text('Jenis Kelamin', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _GenderOption(
+                            gender: Gender.male,
+                            isSelected: _selectedGender == Gender.male,
+                            onTap: () => setState(() => _selectedGender = Gender.male),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _GenderOption(
+                            gender: Gender.female,
+                            isSelected: _selectedGender == Gender.female,
+                            onTap: () => setState(() => _selectedGender = Gender.female),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Status
+                    const Text('Status', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<OffspringStatus>(
+                      value: _selectedStatus,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.info_outline),
+                        border: OutlineInputBorder(),
+                      ),
+                      items: OffspringStatus.values.map((status) => DropdownMenuItem(
+                        value: status,
+                        child: Text(status.displayName),
+                      )).toList(),
+                      onChanged: (value) {
+                        if (value != null) setState(() => _selectedStatus = value);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Birth Date
+                    const Text('Tanggal Lahir', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => _selectDate(context),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: colorScheme.outline),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.cake, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 12),
+                            Text(_formatDate(_birthDate)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Weight
+                    const Text('Berat (kg)', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _weightController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.scale),
+                        border: OutlineInputBorder(),
+                        suffixText: 'kg',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Notes
+                    const Text('Catatan', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _notesController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        prefixIcon: Padding(
+                          padding: EdgeInsets.only(bottom: 48),
+                          child: Icon(Icons.notes),
+                        ),
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Submit Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Simpan Perubahan', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GenderOption extends StatelessWidget {
+  final Gender gender;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _GenderOption({
+    required this.gender,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = gender == Gender.female ? Colors.pink : Colors.blue;
+    
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
+          ),
+          color: isSelected ? color.withAlpha(25) : null,
+        ),
+        child: Column(
+          children: [
+            Text(
+              gender == Gender.male ? '♂' : '♀',
+              style: TextStyle(fontSize: 24, color: isSelected ? color : Colors.grey),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              gender == Gender.male ? 'Jantan' : 'Betina',
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? color : null,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

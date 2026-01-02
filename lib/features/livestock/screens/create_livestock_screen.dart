@@ -1463,3 +1463,411 @@ class _PremiumGenderOption extends StatelessWidget {
   }
 }
 
+/// Helper function to show edit livestock panel from side
+void showEditLivestockPanel(BuildContext context, Livestock livestock) {
+  showGeneralDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Edit Livestock',
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Material(
+          color: Colors.transparent,
+          child: _EditLivestockPanel(livestock: livestock),
+        ),
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final slideAnimation = Tween<Offset>(
+        begin: const Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+      
+      return SlideTransition(position: slideAnimation, child: child);
+    },
+  );
+}
+
+/// Edit Livestock Panel
+class _EditLivestockPanel extends ConsumerStatefulWidget {
+  final Livestock livestock;
+  
+  const _EditLivestockPanel({required this.livestock});
+
+  @override
+  ConsumerState<_EditLivestockPanel> createState() => _EditLivestockPanelState();
+}
+
+class _EditLivestockPanelState extends ConsumerState<_EditLivestockPanel> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _weightController;
+  late TextEditingController _priceController;
+  late TextEditingController _notesController;
+  
+  late String? _selectedStatus;
+  late String? _selectedHousingId;
+  late String? _selectedBreedId;
+  late DateTime? _birthDate;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    final livestock = widget.livestock;
+    _weightController = TextEditingController(text: livestock.weight?.toString() ?? '');
+    _priceController = TextEditingController(text: livestock.purchasePrice?.toStringAsFixed(0) ?? '');
+    _notesController = TextEditingController(text: livestock.notes ?? '');
+    _selectedStatus = livestock.status;
+    _selectedHousingId = livestock.housingId;
+    _selectedBreedId = livestock.breedId;
+    _birthDate = livestock.birthDate;
+  }
+
+  @override
+  void dispose() {
+    _weightController.dispose();
+    _priceController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Pilih tanggal';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _birthDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    
+    if (picked != null) {
+      setState(() => _birthDate = picked);
+    }
+  }
+
+  Future<void> _handleSubmit() async {
+    setState(() => _errorMessage = null);
+    
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final weight = _weightController.text.isEmpty 
+          ? null 
+          : double.tryParse(_weightController.text);
+      
+      // Build updated livestock object
+      final updatedLivestock = widget.livestock.copyWith(
+        housingId: _selectedHousingId,
+        breedId: _selectedBreedId,
+        birthDate: _birthDate,
+        purchasePrice: _priceController.text.isEmpty 
+            ? null 
+            : parseFormattedPrice(_priceController.text),
+        status: _selectedStatus,
+        weight: weight,
+        notes: _notesController.text.trim().isEmpty 
+            ? null 
+            : _notesController.text.trim(),
+      );
+      
+      await ref.read(livestockNotifierProvider.notifier).update(updatedLivestock);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${widget.livestock.code} berhasil diperbarui!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final livestock = widget.livestock;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final panelWidth = screenWidth > 600 ? 480.0 : screenWidth * 0.92;
+    final housingsAsync = ref.watch(availableHousingsProvider);
+    final breedsAsync = ref.watch(breedNotifierProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+    final genderColor = livestock.isFemale ? const Color(0xFFEC4899) : const Color(0xFF3B82F6);
+    final farmId = ref.watch(currentFarmProvider)?.id ?? '';
+    final statusAsync = ref.watch(statusNotifierProvider(farmId));
+
+    return Container(
+      width: panelWidth,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 30,
+            offset: const Offset(-8, 0),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              border: Border(
+                bottom: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: genderColor.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      livestock.genderIcon,
+                      style: TextStyle(fontSize: 20, color: genderColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Edit ${livestock.code}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        livestock.breedName ?? '',
+                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Form
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Error message
+                    if (_errorMessage != null)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red[200]!),
+                        ),
+                        child: Text(_errorMessage!, style: TextStyle(color: Colors.red[700])),
+                      ),
+
+                    // Status
+                    const Text('Status', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    statusAsync.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const Text('Error loading statuses'),
+                      data: (statuses) {
+                        final validStatuses = statuses.where(
+                          (s) => s.isActive && (s.validForGender == 'both' || s.validForGender == livestock.gender.value)
+                        ).toList();
+                        
+                        return DropdownButtonFormField<String>(
+                          value: _selectedStatus,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.info_outline),
+                            border: OutlineInputBorder(),
+                          ),
+                          items: validStatuses.map((status) => DropdownMenuItem(
+                            value: status.code,
+                            child: Text(status.name),
+                          )).toList(),
+                          onChanged: (value) => setState(() => _selectedStatus = value),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Breed
+                    const Text('Ras', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    breedsAsync.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const Text('Error loading breeds'),
+                      data: (breeds) => DropdownButtonFormField<String>(
+                        value: _selectedBreedId,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.category),
+                          border: OutlineInputBorder(),
+                        ),
+                        items: breeds.map((b) => DropdownMenuItem(
+                          value: b.id,
+                          child: Text(b.displayName),
+                        )).toList(),
+                        onChanged: (value) => setState(() => _selectedBreedId = value),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Housing
+                    const Text('Kandang', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    housingsAsync.when(
+                      loading: () => const LinearProgressIndicator(),
+                      error: (_, __) => const Text('Error loading housings'),
+                      data: (housings) => DropdownButtonFormField<String>(
+                        value: _selectedHousingId,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.home_work),
+                          border: OutlineInputBorder(),
+                        ),
+                        items: housings.map((h) => DropdownMenuItem(
+                          value: h.id,
+                          child: Text(h.displayName),
+                        )).toList(),
+                        onChanged: (value) => setState(() => _selectedHousingId = value),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Birth Date
+                    const Text('Tanggal Lahir', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () => _selectDate(context),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: colorScheme.outline),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.cake, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 12),
+                            Text(_formatDate(_birthDate)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Weight
+                    const Text('Berat (kg)', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _weightController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.scale),
+                        border: OutlineInputBorder(),
+                        suffixText: 'kg',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Purchase Price
+                    const Text('Harga Beli', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _priceController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsSeparatorInputFormatter()],
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.attach_money),
+                        border: OutlineInputBorder(),
+                        prefixText: 'Rp ',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Notes
+                    const Text('Catatan', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _notesController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        prefixIcon: Padding(
+                          padding: EdgeInsets.only(bottom: 48),
+                          child: Icon(Icons.notes),
+                        ),
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Submit Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _handleSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Simpan Perubahan', style: TextStyle(fontWeight: FontWeight.w600)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

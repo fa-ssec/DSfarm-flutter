@@ -92,7 +92,25 @@ class FinanceNotifier extends StateNotifier<AsyncValue<List<FinanceTransaction>>
   }
 
   Future<void> delete(String id) async {
-    await _repository.deleteTransaction(id);
+    print('DEBUG FinanceNotifier.delete: Deleting transaction $id');
+    try {
+      await _repository.deleteTransaction(id);
+      print('DEBUG FinanceNotifier.delete: Delete completed, reloading transactions');
+      await loadTransactions();
+      print('DEBUG FinanceNotifier.delete: Transactions reloaded');
+    } catch (e, stack) {
+      print('DEBUG FinanceNotifier.delete: ERROR - $e');
+      print('DEBUG FinanceNotifier.delete: Stack - $stack');
+      rethrow;
+    }
+  }
+
+  /// Delete all transactions for the current farm
+  Future<void> deleteAll() async {
+    if (_farmId == null) throw Exception('No farm selected');
+    print('DEBUG FinanceNotifier.deleteAll: Deleting all transactions for farm $_farmId');
+    await _repository.deleteAllTransactions(_farmId);
+    print('DEBUG FinanceNotifier.deleteAll: All transactions deleted');
     await loadTransactions();
   }
 }

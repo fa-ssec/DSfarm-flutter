@@ -67,6 +67,7 @@ class _DashboardContent extends ConsumerStatefulWidget {
 
 class _DashboardContentState extends ConsumerState<_DashboardContent> {
   String _chartPeriod = '6M'; // 1M, 3M, 6M
+  String _salesPeriod = '12M'; // 1M, 3M, 6M, 12M
 
   @override
   Widget build(BuildContext context) {
@@ -153,6 +154,12 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
                       _buildPopulationDistribution(context, livestockAsync, offspringAsync),
                     ],
                   ),
+            const SizedBox(height: 24),
+
+            // ═══════════════════════════════════════════
+            // SALES OVERVIEW
+            // ═══════════════════════════════════════════
+            _buildSalesOverview(context, financeAsync),
             const SizedBox(height: 80),
           ],
         ),
@@ -743,6 +750,292 @@ class _DashboardContentState extends ConsumerState<_DashboardContent> {
           ],
         ),
       ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SALES OVERVIEW BAR CHART (MONTHLY - GROUPED)
+  // ═══════════════════════════════════════════════════════════════════════════
+  Widget _buildSalesOverview(BuildContext context, AsyncValue financeAsync) {
+    final colorScheme = Theme.of(context).colorScheme;
+    
+    // Get number of months based on filter
+    int monthsToShow;
+    switch (_salesPeriod) {
+      case '1M': monthsToShow = 1;
+      case '3M': monthsToShow = 3;
+      case '6M': monthsToShow = 6;
+      default: monthsToShow = 12;
+    }
+    
+    // Calculate date range
+    final now = DateTime.now();
+    final startDate = DateTime(now.year, now.month - monthsToShow + 1, 1);
+    
+    // Aggregate sales data by month and type (Indukan, Anakan, Lain)
+    final Map<String, int> monthlyIndukan = {};
+    final Map<String, int> monthlyAnakan = {};
+    final Map<String, double> monthlyTotals = {};
+    int totalIndukan = 0;
+    int totalAnakan = 0;
+    double totalAmount = 0;
+    
+    // Initialize months
+    final months = <String>[];
+    final monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    for (int i = 0; i < monthsToShow; i++) {
+      final date = DateTime(startDate.year, startDate.month + i, 1);
+      final key = '${date.year}-${date.month.toString().padLeft(2, '0')}';
+      months.add(key);
+      monthlyIndukan[key] = 0;
+      monthlyAnakan[key] = 0;
+      monthlyTotals[key] = 0;
+    }
+    
+    financeAsync.whenData((transactions) {
+      for (final tx in transactions) {
+        if (!tx.isIncome) continue;
+        
+        final txDate = tx.transactionDate;
+        if (txDate.isBefore(startDate)) continue;
+        
+        final key = '${txDate.year}-${txDate.month.toString().padLeft(2, '0')}';
+        if (!monthlyIndukan.containsKey(key)) continue;
+        
+        monthlyTotals[key] = monthlyTotals[key]! + tx.amount;
+        totalAmount += tx.amount;
+        
+        if (tx.referenceType == 'livestock') {
+          monthlyIndukan[key] = monthlyIndukan[key]! + 1;
+          totalIndukan++;
+        } else if (tx.referenceType == 'offspring') {
+          monthlyAnakan[key] = monthlyAnakan[key]! + 1;
+          totalAnakan++;
+        }
+      }
+    });
+    
+    final totalCount = totalIndukan + totalAnakan;
+    final maxCount = months.map((k) {
+      final ind = monthlyIndukan[k] ?? 0;
+      final ana = monthlyAnakan[k] ?? 0;
+      return ind > ana ? ind : ana;
+    }).reduce((a, b) => a > b ? a : b);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with filter dropdown
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Overview Penjualan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                PopupMenuButton<String>(
+                  initialValue: _salesPeriod,
+                  onSelected: (value) => setState(() => _salesPeriod = value),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: '1M', child: Text('1 Bulan')),
+                    const PopupMenuItem(value: '3M', child: Text('3 Bulan')),
+                    const PopupMenuItem(value: '6M', child: Text('6 Bulan')),
+                    const PopupMenuItem(value: '12M', child: Text('12 Bulan')),
+                  ],
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_getSalesPeriodLabel(), style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+                        const SizedBox(width: 4),
+                        Icon(Icons.keyboard_arrow_down, size: 16, color: colorScheme.onSurfaceVariant),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Summary with breakdown
+            Row(
+              children: [
+                Text(
+                  '$totalCount',
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'terjual',
+                  style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(width: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withAlpha(20),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _formatCurrency(totalAmount),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            // Bar Chart
+            SizedBox(
+              height: 200,
+              child: totalCount == 0
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.bar_chart_rounded, size: 48, color: colorScheme.outlineVariant),
+                          const SizedBox(height: 8),
+                          Text('Belum ada data penjualan', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    )
+                  : BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        maxY: (maxCount * 1.3).clamp(1, double.infinity),
+                        barTouchData: BarTouchData(
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              if (groupIndex >= months.length) return null;
+                              final key = months[groupIndex];
+                              final parts = key.split('-');
+                              final monthNum = int.parse(parts[1]);
+                              final monthName = monthLabels[monthNum - 1];
+                              final label = rodIndex == 0 ? 'Indukan' : 'Anakan';
+                              return BarTooltipItem(
+                                '$monthName: $label\n${rod.toY.toInt()} pcs',
+                                const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                              );
+                            },
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          show: true,
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 30,
+                              getTitlesWidget: (value, meta) {
+                                final idx = value.toInt();
+                                if (idx < 0 || idx >= months.length) return const SizedBox();
+                                final key = months[idx];
+                                final parts = key.split('-');
+                                final monthNum = int.parse(parts[1]);
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    monthLabels[monthNum - 1],
+                                    style: TextStyle(fontSize: 10, color: colorScheme.onSurfaceVariant),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        ),
+                        gridData: const FlGridData(show: false),
+                        borderData: FlBorderData(show: false),
+                        barGroups: months.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final key = entry.value;
+                          final indukan = monthlyIndukan[key]?.toDouble() ?? 0;
+                          final anakan = monthlyAnakan[key]?.toDouble() ?? 0;
+                          return _buildGroupedBarGroup(idx, indukan, anakan);
+                        }).toList(),
+                      ),
+                    ),
+            ),
+            
+            // Legend
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _salesLegendItem('Indukan', const Color(0xFF3B82F6), totalIndukan),
+                const SizedBox(width: 24),
+                _salesLegendItem('Anakan', const Color(0xFFEC4899), totalAnakan),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getSalesPeriodLabel() {
+    switch (_salesPeriod) {
+      case '1M': return '1 Bulan';
+      case '3M': return '3 Bulan';
+      case '6M': return '6 Bulan';
+      default: return '12 Bulan';
+    }
+  }
+
+  BarChartGroupData _buildGroupedBarGroup(int x, double indukan, double anakan) {
+    return BarChartGroupData(
+      x: x,
+      barsSpace: 4,
+      barRods: [
+        // Indukan bar (blue)
+        BarChartRodData(
+          toY: indukan,
+          color: const Color(0xFF3B82F6),
+          width: 12,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          backDrawRodData: BackgroundBarChartRodData(
+            show: true,
+            toY: indukan > 0 ? indukan * 1.3 : 0.5,
+            color: const Color(0xFF3B82F6).withAlpha(30),
+          ),
+        ),
+        // Anakan bar (pink)
+        BarChartRodData(
+          toY: anakan,
+          color: const Color(0xFFEC4899),
+          width: 12,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          backDrawRodData: BackgroundBarChartRodData(
+            show: true,
+            toY: anakan > 0 ? anakan * 1.3 : 0.5,
+            color: const Color(0xFFEC4899).withAlpha(30),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _salesLegendItem(String label, Color color, int count) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text('$label ($count)', style: const TextStyle(fontSize: 12)),
+      ],
     );
   }
 
