@@ -174,14 +174,15 @@ class _Sidebar extends ConsumerWidget {
                 _NavItem(icon: Icons.child_care_rounded, label: 'Anakan', index: 2, selectedIndex: selectedIndex, isDrawer: isDrawer),
                 _NavItem(icon: Icons.account_balance_wallet_rounded, label: 'Keuangan', index: 3, selectedIndex: selectedIndex, isDrawer: isDrawer),
                 _NavItem(icon: Icons.inventory_2_rounded, label: 'Inventaris', index: 4, selectedIndex: selectedIndex, isDrawer: isDrawer),
+                _NavItem(icon: Icons.home_work_rounded, label: 'Kandang', index: 5, selectedIndex: selectedIndex, isDrawer: isDrawer),
                 
                 const SizedBox(height: 8),
                 Divider(color: colorScheme.outlineVariant.withAlpha(60)),
                 const SizedBox(height: 8),
                 
-                _NavItem(icon: Icons.local_hospital_rounded, label: 'Kesehatan', index: 5, selectedIndex: selectedIndex, isDrawer: isDrawer),
-                _NavItem(icon: Icons.notifications_rounded, label: 'Pengingat', index: 6, selectedIndex: selectedIndex, isDrawer: isDrawer),
-                _NavItem(icon: Icons.assessment_rounded, label: 'Laporan', index: 7, selectedIndex: selectedIndex, isDrawer: isDrawer),
+                _NavItem(icon: Icons.local_hospital_rounded, label: 'Kesehatan', index: 6, selectedIndex: selectedIndex, isDrawer: isDrawer),
+                _NavItem(icon: Icons.notifications_rounded, label: 'Pengingat', index: 7, selectedIndex: selectedIndex, isDrawer: isDrawer),
+                _NavItem(icon: Icons.assessment_rounded, label: 'Laporan', index: 8, selectedIndex: selectedIndex, isDrawer: isDrawer),
               ],
             ),
           ),
@@ -193,7 +194,7 @@ class _Sidebar extends ConsumerWidget {
               children: [
                 Divider(color: colorScheme.outlineVariant.withAlpha(60)),
                 const SizedBox(height: 8),
-                _NavItem(icon: Icons.settings_rounded, label: 'Pengaturan', index: 8, selectedIndex: selectedIndex, isDrawer: isDrawer),
+                _NavItem(icon: Icons.settings_rounded, label: 'Pengaturan', index: 9, selectedIndex: selectedIndex, isDrawer: isDrawer),
                 _NavItem(icon: Icons.logout_rounded, label: 'Keluar', index: -1, selectedIndex: selectedIndex, isLogout: true, isDrawer: isDrawer),
               ],
             ),
@@ -275,10 +276,11 @@ class _NavItem extends ConsumerWidget {
       case 2: context.go('/dashboard/$farmId/offspring'); break;
       case 3: context.go('/dashboard/$farmId/finance'); break;
       case 4: context.go('/dashboard/$farmId/inventory'); break;
-      case 5: context.go('/dashboard/$farmId/health'); break;
-      case 6: context.go('/dashboard/$farmId/reminders'); break;
-      case 7: context.go('/dashboard/$farmId/reports'); break;
-      case 8: context.go('/dashboard/$farmId/settings'); break;
+      case 5: context.go('/dashboard/$farmId/housing'); break;
+      case 6: context.go('/dashboard/$farmId/health'); break;
+      case 7: context.go('/dashboard/$farmId/reminders'); break;
+      case 8: context.go('/dashboard/$farmId/reports'); break;
+      case 9: context.go('/dashboard/$farmId/settings'); break;
       case -1: // Logout
         ref.read(authNotifierProvider.notifier).signOut();
         context.go('/login');

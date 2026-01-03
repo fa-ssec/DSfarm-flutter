@@ -15,10 +15,12 @@ import 'features/farm_selector/screens/farm_list_screen.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
 import 'features/lineage/screens/lineage_screen.dart';
 import 'features/livestock/screens/livestock_list_screen.dart';
+import 'features/public/public_housing_view.dart';
 
 import 'features/offspring/screens/offspring_list_screen.dart';
 import 'features/finance/screens/finance_screen.dart';
 import 'features/inventory/screens/inventory_screen.dart';
+import 'features/housing/screens/housing_list_screen.dart';
 import 'features/health/screens/health_screen.dart';
 import 'features/reminder/screens/reminder_screen.dart';
 import 'features/reports/screens/reports_screen.dart';
@@ -37,6 +39,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = authState.valueOrNull != null;
       final isLoggingIn = state.matchedLocation == '/login' || 
                           state.matchedLocation == '/register';
+      
+      // Allow public routes without auth
+      final isPublicRoute = state.matchedLocation.startsWith('/kandang/');
+
+      // If accessing public route, allow without auth
+      if (isPublicRoute) {
+        return null;
+      }
 
       // If not logged in and not on login/register page, redirect to login
       if (!isLoggedIn && !isLoggingIn) {
@@ -52,6 +62,18 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
 
     routes: [
+      // ═══════════════════════════════════════════════════════════
+      // PUBLIC ROUTES (No Auth Required)
+      // ═══════════════════════════════════════════════════════════
+      GoRoute(
+        path: '/kandang/:housingId',
+        name: 'publicHousing',
+        builder: (context, state) {
+          final housingId = state.pathParameters['housingId']!;
+          return PublicHousingViewPage(housingId: housingId);
+        },
+      ),
+      
       // ═══════════════════════════════════════════════════════════
       // AUTH ROUTES (Public)
       // ═══════════════════════════════════════════════════════════
@@ -106,6 +128,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'inventory',
             name: 'inventory',
             pageBuilder: (context, state) => const NoTransitionPage(child: InventoryScreen()),
+          ),
+          GoRoute(
+            path: 'housing',
+            name: 'housing',
+            pageBuilder: (context, state) => const NoTransitionPage(child: HousingListScreen()),
           ),
           GoRoute(
             path: 'health',

@@ -9,6 +9,7 @@ import '../models/finance.dart';
 import '../repositories/offspring_repository.dart';
 import '../repositories/finance_repository.dart';
 import '../providers/farm_provider.dart';
+import '../services/offline_cache_service.dart';
 
 /// Repository provider
 final offspringRepositoryProvider = Provider<OffspringRepository>((ref) {
@@ -59,12 +60,37 @@ class OffspringNotifier extends StateNotifier<AsyncValue<List<Offspring>>> {
       return;
     }
     
-    state = const AsyncValue.loading();
+    // Try cache first
+    final cachedData = OfflineCacheService.getCachedOffspring(_farmId);
+    List<Offspring>? cachedList;
+    if (cachedData != null && cachedData.isNotEmpty) {
+      cachedList = cachedData.map((m) => Offspring.fromJson(m)).toList();
+      state = AsyncValue.data(cachedList);
+    } else {
+      state = const AsyncValue.loading();
+    }
+    
+    // If offline, use cache only
+    if (!OfflineCacheService.isOnline && cachedList != null) {
+      print('OffspringProvider: Offline - using cached data');
+      return;
+    }
+    
+    // Fetch from server
     try {
       final offsprings = await _repository.getByFarm(_farmId);
       state = AsyncValue.data(offsprings);
+      
+      // Update cache with raw JSON
+      final jsonList = offsprings.map((o) => o.toJson()..['id'] = o.id..['created_at'] = o.createdAt.toIso8601String()).toList();
+      await OfflineCacheService.cacheOffspring(_farmId, jsonList);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (cachedList != null && cachedList.isNotEmpty) {
+        print('OffspringProvider: Fetch failed, using cached data');
+        state = AsyncValue.data(cachedList);
+      } else {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 

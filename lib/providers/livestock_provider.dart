@@ -9,6 +9,7 @@ import '../models/finance.dart';
 import '../repositories/livestock_repository.dart';
 import '../repositories/finance_repository.dart';
 import '../providers/farm_provider.dart';
+import '../services/offline_cache_service.dart';
 
 /// Repository provider
 final livestockRepositoryProvider = Provider<LivestockRepository>((ref) {
@@ -77,12 +78,37 @@ class LivestockNotifier extends StateNotifier<AsyncValue<List<Livestock>>> {
       return;
     }
     
-    state = const AsyncValue.loading();
+    // Try cache first
+    final cachedData = OfflineCacheService.getCachedLivestock(_farmId);
+    List<Livestock>? cachedList;
+    if (cachedData != null && cachedData.isNotEmpty) {
+      cachedList = cachedData.map((m) => Livestock.fromJson(m)).toList();
+      state = AsyncValue.data(cachedList);
+    } else {
+      state = const AsyncValue.loading();
+    }
+    
+    // If offline, use cache only
+    if (!OfflineCacheService.isOnline && cachedList != null) {
+      print('LivestockProvider: Offline - using cached data');
+      return;
+    }
+    
+    // Fetch from server
     try {
       final livestocks = await _repository.getByFarm(_farmId);
       state = AsyncValue.data(livestocks);
+      
+      // Update cache with raw JSON
+      final jsonList = livestocks.map((l) => l.toJson()..['id'] = l.id..['created_at'] = l.createdAt.toIso8601String()).toList();
+      await OfflineCacheService.cacheLivestock(_farmId, jsonList);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (cachedList != null && cachedList.isNotEmpty) {
+        print('LivestockProvider: Fetch failed, using cached data');
+        state = AsyncValue.data(cachedList);
+      } else {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 

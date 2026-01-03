@@ -400,44 +400,78 @@ class _OffspringListScreenState extends ConsumerState<OffspringListScreen> {
           Container(
             color: const Color(0xFFF9FAFB),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'ID ANAKAN', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    'KELAMIN', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'UMUR', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'BERAT', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'STATUS', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = MediaQuery.of(context).size.width < 600;
+                if (isMobile) {
+                  // Mobile: 3 columns
+                  return Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'ID', 
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'UMUR', 
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'STATUS', 
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                // Desktop: 5 columns
+                return Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'ID ANAKAN', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                        'KELAMIN', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'UMUR', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'BERAT', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'STATUS', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
@@ -928,84 +962,132 @@ class _OffspringListItem extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Row(
-          children: [
-            // ID
-            Expanded(
-              flex: 2,
-              child: Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = MediaQuery.of(context).size.width < 600;
+            
+            if (isMobile) {
+              // Mobile: 3 columns - ID, Age, Status
+              return Row(
                 children: [
-                  Text(
-                    offspring.displayName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (isNew) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'BARU',
-                        style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
+                  // ID
+                  Expanded(
+                    flex: 2,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            offspring.displayName,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isNew) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'BARU',
+                              style: TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
+                  ),
+                  // Age
+                  Expanded(
+                    flex: 1,
+                    child: Text(
+                      offspring.ageFormatted,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                  ),
+                  // Status
+                  Expanded(
+                    flex: 2,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _StatusBadge(status: offspring.effectiveStatus),
+                    ),
+                  ),
                 ],
-              ),
-            ),
-            // Induk hidden
-            /*
-            Expanded(
-              flex: 2,
-              child: Text(
-                offspring.damCode ?? '-',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-            ),
-            */
-            // Gender
-            Expanded(
-              flex: 1,
-              child: Text(
-                isFemale ? '♀' : '♂',
-                style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold,
-                  color: genderColor,
+              );
+            }
+            
+            // Desktop: 5 columns
+            return Row(
+              children: [
+                // ID
+                Expanded(
+                  flex: 2,
+                  child: Row(
+                    children: [
+                      Text(
+                        offspring.displayName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (isNew) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'BARU',
+                            style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            // Umur
-            Expanded(
-              flex: 2,
-              child: Text(
-                offspring.ageFormatted,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-            ),
-            // Berat
-            Expanded(
-              flex: 2,
-              child: Text(
-                offspring.weight != null ? '${offspring.weight} kg' : '-',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-            ),
-            // Status
-            Expanded(
-              flex: 2,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: _StatusBadge(status: offspring.effectiveStatus),
-              ),
-            ),
-            // Arrow hidden
-            // Icon(Icons.chevron_right, size: 20, color: Colors.grey[400]),
-          ],
+                // Gender
+                Expanded(
+                  flex: 1,
+                  child: Text(
+                    isFemale ? '♀' : '♂',
+                    style: TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.bold,
+                      color: genderColor,
+                    ),
+                  ),
+                ),
+                // Umur
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    offspring.ageFormatted,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  ),
+                ),
+                // Berat
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    offspring.weight != null ? '${offspring.weight} kg' : '-',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  ),
+                ),
+                // Status
+                Expanded(
+                  flex: 2,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _StatusBadge(status: offspring.effectiveStatus),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

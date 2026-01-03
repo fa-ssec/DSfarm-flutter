@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/finance.dart';
 import '../repositories/finance_repository.dart';
 import '../providers/farm_provider.dart';
+import '../services/offline_cache_service.dart';
 
 /// Repository provider
 final financeRepositoryProvider = Provider<FinanceRepository>((ref) {
@@ -56,12 +57,35 @@ class FinanceNotifier extends StateNotifier<AsyncValue<List<FinanceTransaction>>
       return;
     }
     
-    state = const AsyncValue.loading();
+    // Try cache first (for offline mode or while loading)
+    final cached = OfflineCacheService.getCachedFinanceTransactions(_farmId);
+    if (cached != null && cached.isNotEmpty) {
+      state = AsyncValue.data(cached);
+    } else {
+      state = const AsyncValue.loading();
+    }
+    
+    // If offline and have cache, don't try to fetch
+    if (!OfflineCacheService.isOnline && cached != null) {
+      print('FinanceProvider: Offline - using cached data');
+      return;
+    }
+    
+    // Fetch from server
     try {
       final transactions = await _repository.getTransactions(_farmId);
       state = AsyncValue.data(transactions);
+      
+      // Update cache
+      await OfflineCacheService.cacheFinanceTransactions(_farmId, transactions);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      // If fetch fails but we have cache, keep using cache
+      if (cached != null && cached.isNotEmpty) {
+        print('FinanceProvider: Fetch failed, using cached data');
+        state = AsyncValue.data(cached);
+      } else {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
@@ -76,6 +100,53 @@ class FinanceNotifier extends StateNotifier<AsyncValue<List<FinanceTransaction>>
   }) async {
     if (_farmId == null) throw Exception('No farm selected');
     
+    // If offline, save to pending queue
+    if (!OfflineCacheService.isOnline) {
+      print('FinanceProvider: Offline - saving to pending queue');
+      
+      // Create temporary transaction for UI
+      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+      final tempTransaction = FinanceTransaction(
+        id: tempId,
+        farmId: _farmId,
+        type: type,
+        categoryId: categoryId,
+        categoryName: null,
+        amount: amount,
+        transactionDate: transactionDate,
+        description: description,
+        referenceId: referenceId,
+        referenceType: referenceType,
+        createdAt: DateTime.now(),
+      );
+      
+      // Add to pending operations
+      await OfflineCacheService.addPendingOperation(
+        type: 'create',
+        entity: 'finance',
+        data: {
+          'farm_id': _farmId,
+          'type': type.name,
+          'category_id': categoryId,
+          'amount': amount,
+          'transaction_date': transactionDate.toIso8601String(),
+          'description': description,
+          'reference_id': referenceId,
+          'reference_type': referenceType,
+        },
+      );
+      
+      // Optimistically update UI
+      final current = state.valueOrNull ?? [];
+      state = AsyncValue.data([tempTransaction, ...current]);
+      
+      // Update cache
+      await OfflineCacheService.cacheFinanceTransactions(_farmId, [tempTransaction, ...current]);
+      
+      return tempTransaction;
+    }
+    
+    // Online - normal create
     final transaction = await _repository.createTransaction(
       farmId: _farmId,
       type: type,

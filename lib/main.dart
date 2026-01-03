@@ -10,13 +10,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/services/supabase_service.dart';
+import 'services/offline_cache_service.dart';
+import 'services/sync_queue_service.dart';
 import 'app_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Offline Cache (Hive)
+  await OfflineCacheService.init();
+
   // Initialize Supabase
   await SupabaseService.initialize();
+
+  // Start Sync Queue Listener
+  SyncQueueService.startListening();
 
   runApp(
     const ProviderScope(

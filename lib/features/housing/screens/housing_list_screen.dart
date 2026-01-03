@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/housing.dart';
 import '../../../providers/housing_provider.dart';
 import '../../../providers/livestock_provider.dart';
+import '../widgets/housing_qr_dialog.dart';
 import 'create_housing_screen.dart';
 
 class HousingListScreen extends ConsumerStatefulWidget {
@@ -396,6 +397,15 @@ class _HousingDetailSheet extends ConsumerWidget {
                     Text('Kapasitas: ${housing.currentOccupancy ?? 0}/${housing.capacity}'),
                   ],
                 ),
+              ),
+              // QR Code button
+              IconButton(
+                icon: const Icon(Icons.qr_code_2, color: Colors.blue),
+                tooltip: 'QR Code',
+                onPressed: () {
+                  Navigator.pop(context); // Close bottom sheet
+                  showHousingQRDialog(context, housing);
+                },
               ),
               // Delete button
               IconButton(

@@ -785,51 +785,85 @@ class _LivestockListScreenState extends ConsumerState<LivestockListScreen> {
           Container(
             color: const Color(0xFFF9FAFB),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'ID INDUKAN', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'ID LAHIR', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    'KELAMIN', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'HARGA BELI', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'UMUR', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    'STATUS', 
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
-                  ),
-                ),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = MediaQuery.of(context).size.width < 600;
+                if (isMobile) {
+                  // Mobile: 3 columns
+                  return Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'ID', 
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          'KELAMIN', 
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          'STATUS', 
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                // Desktop: 6 columns
+                return Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'ID INDUKAN', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'ID LAHIR', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                        'KELAMIN', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'HARGA BELI', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'UMUR', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        'STATUS', 
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600], letterSpacing: 0.5),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
           const Divider(height: 1, color: Color(0xFFE5E7EB)),
@@ -1085,89 +1119,164 @@ class _LivestockListItem extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Row(
-          children: [
-            // ID Indukan & Badge
-            Expanded(
-              flex: 2,
-              child: Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = MediaQuery.of(context).size.width < 600;
+            
+            if (isMobile) {
+              // Mobile: 3 columns - ID, Gender, Status
+              return Row(
                 children: [
-                  Text(
-                    livestock.code,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  // ID Indukan & Badge
+                  Expanded(
+                    flex: 2,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            livestock.code,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isNew) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'BARU',
+                              style: TextStyle(fontSize: 8, color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  if (isNew) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'BARU',
-                        style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                  // Gender
+                  Expanded(
+                    flex: 1,
+                    child: Text(
+                      livestock.gender == Gender.male ? '♂' : '♀',
+                      style: TextStyle(
+                        fontSize: 16, 
+                        fontWeight: FontWeight.bold,
+                        color: livestock.gender == Gender.male ? const Color(0xFF3B82F6) : const Color(0xFFEC4899),
                       ),
                     ),
-                  ],
+                  ),
+                  // Status
+                  Expanded(
+                    flex: 2,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          livestock.status,
+                          style: TextStyle(fontSize: 10, color: statusTextColor, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
-              ),
-            ),
-            // ID Lahir
-            Expanded(
-              flex: 2,
-              child: Text(
-                livestock.acquisitionType == AcquisitionType.purchased ? 'FOUNDER' : 'Lahir di Farm',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-            ),
-            // Gender
-            Expanded(
-              flex: 1,
-              child: Text(
-                livestock.gender == Gender.male ? '♂' : '♀',
-                style: TextStyle(
-                  fontSize: 18, 
-                  fontWeight: FontWeight.bold,
-                  color: livestock.gender == Gender.male ? const Color(0xFF3B82F6) : const Color(0xFFEC4899),
-                ),
-              ),
-            ),
-            // Harga Beli
-            Expanded(
-              flex: 2,
-              child: Text(
-                livestock.purchasePrice != null ? currencyFormat.format(livestock.purchasePrice) : '-',
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-            ),
-            // Umur
-            Expanded(
-              flex: 2,
-              child: Text(
-                livestock.ageFormatted,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-              ),
-            ),
-            // Status Pills
-            Expanded(
-              flex: 2,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    borderRadius: BorderRadius.circular(16),
+              );
+            }
+            
+            // Desktop: 6 columns
+            return Row(
+              children: [
+                // ID Indukan & Badge
+                Expanded(
+                  flex: 2,
+                  child: Row(
+                    children: [
+                      Text(
+                        livestock.code,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      if (isNew) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'BARU',
+                            style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
+                ),
+                // ID Lahir
+                Expanded(
+                  flex: 2,
                   child: Text(
-                    livestock.status,
-                    style: TextStyle(fontSize: 12, color: statusTextColor, fontWeight: FontWeight.w600),
+                    livestock.acquisitionType == AcquisitionType.purchased ? 'FOUNDER' : 'Lahir di Farm',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                   ),
                 ),
-              ),
-            ),
-          ],
+                // Gender
+                Expanded(
+                  flex: 1,
+                  child: Text(
+                    livestock.gender == Gender.male ? '♂' : '♀',
+                    style: TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.bold,
+                      color: livestock.gender == Gender.male ? const Color(0xFF3B82F6) : const Color(0xFFEC4899),
+                    ),
+                  ),
+                ),
+                // Harga Beli
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    livestock.purchasePrice != null ? currencyFormat.format(livestock.purchasePrice) : '-',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  ),
+                ),
+                // Umur
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    livestock.ageFormatted,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  ),
+                ),
+                // Status Pills
+                Expanded(
+                  flex: 2,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        livestock.status,
+                        style: TextStyle(fontSize: 12, color: statusTextColor, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

@@ -80,10 +80,44 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
               loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
               error: (e, _) => Text('Error: $e'),
               data: (transactions) {
+                // Current month data
+                final now = DateTime.now();
+                final currentMonthStart = DateTime(now.year, now.month, 1);
+                final lastMonthStart = DateTime(now.year, now.month - 1, 1);
+                
+                // Filter transactions by month
+                final currentMonthTx = transactions.where((t) => 
+                    t.transactionDate.isAfter(currentMonthStart.subtract(const Duration(days: 1))));
+                final lastMonthTx = transactions.where((t) => 
+                    t.transactionDate.isAfter(lastMonthStart.subtract(const Duration(days: 1))) &&
+                    t.transactionDate.isBefore(currentMonthStart));
+                
+                // Calculate current month totals
                 final income = transactions.where((t) => t.isIncome).fold<double>(0, (s, t) => s + t.amount);
                 final expense = transactions.where((t) => !t.isIncome).fold<double>(0, (s, t) => s + t.amount);
                 final profit = income - expense;
-                final totalAssets = income; // Simplified for now
+                final totalAssets = income;
+                
+                // Calculate last month totals
+                final lastIncome = lastMonthTx.where((t) => t.isIncome).fold<double>(0, (s, t) => s + t.amount);
+                final lastExpense = lastMonthTx.where((t) => !t.isIncome).fold<double>(0, (s, t) => s + t.amount);
+                final lastProfit = lastIncome - lastExpense;
+                final lastAssets = lastIncome;
+                
+                // Current month only
+                final currIncome = currentMonthTx.where((t) => t.isIncome).fold<double>(0, (s, t) => s + t.amount);
+                final currExpense = currentMonthTx.where((t) => !t.isIncome).fold<double>(0, (s, t) => s + t.amount);
+                
+                // Calculate trends (percentage change)
+                double calcTrend(double current, double previous) {
+                  if (previous == 0) return current > 0 ? 100.0 : 0.0;
+                  return ((current - previous) / previous) * 100;
+                }
+                
+                final assetTrend = calcTrend(currIncome, lastIncome);
+                final incomeTrend = calcTrend(currIncome, lastIncome);
+                final expenseTrend = calcTrend(currExpense, lastExpense);
+                final profitTrend = calcTrend(currIncome - currExpense, lastProfit);
                 
                 return Wrap(
                   spacing: 16,
@@ -92,28 +126,28 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     _SummaryCard(
                       title: 'TOTAL ASET',
                       value: totalAssets,
-                      trend: 12.5,
+                      trend: assetTrend,
                       icon: Icons.account_balance_wallet_rounded,
                       iconColor: const Color(0xFF3B82F6),
                     ),
                     _SummaryCard(
                       title: 'TOTAL PEMASUKAN',
                       value: income,
-                      trend: 8.2,
+                      trend: incomeTrend,
                       icon: Icons.trending_up_rounded,
                       iconColor: const Color(0xFF10B981),
                     ),
                     _SummaryCard(
                       title: 'TOTAL PENGELUARAN',
                       value: expense,
-                      trend: 2.1,
+                      trend: expenseTrend,
                       icon: Icons.trending_down_rounded,
                       iconColor: const Color(0xFFEF4444),
                     ),
                     _SummaryCard(
                       title: 'LABA BERSIH',
                       value: profit,
-                      trend: profit >= 0 ? 14.4 : -5.0,
+                      trend: profitTrend,
                       icon: Icons.account_balance_rounded,
                       iconColor: const Color(0xFFF59E0B),
                       isPremium: true,
@@ -933,14 +967,30 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: Row(
-              children: [
-                const Expanded(flex: 2, child: Text('ID TRANSAKSI', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
-                const Expanded(flex: 2, child: Text('KATEGORI', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
-                const Expanded(flex: 2, child: Text('TANGGAL', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
-                const Expanded(flex: 1, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
-                const Expanded(flex: 2, child: Text('JUMLAH', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = MediaQuery.of(context).size.width < 600;
+                if (isMobile) {
+                  // Mobile: 3 columns only
+                  return const Row(
+                    children: [
+                      Expanded(flex: 2, child: Text('ID', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
+                      Expanded(flex: 2, child: Text('KATEGORI', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
+                      Expanded(flex: 2, child: Text('JUMLAH', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
+                    ],
+                  );
+                }
+                // Desktop: 5 columns
+                return const Row(
+                  children: [
+                    Expanded(flex: 2, child: Text('ID TRANSAKSI', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
+                    Expanded(flex: 2, child: Text('KATEGORI', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
+                    Expanded(flex: 2, child: Text('TANGGAL', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
+                    Expanded(flex: 1, child: Text('STATUS', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
+                    Expanded(flex: 2, child: Text('JUMLAH', textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, letterSpacing: 0.5))),
+                  ],
+                );
+              },
             ),
           ),
           // Table Rows
@@ -966,76 +1016,134 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withAlpha(60))),
         ),
-        child: Row(
-          children: [
-            // Transaction ID
-            Expanded(
-              flex: 2,
-              child: Text(shortId, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            ),
-            // Category with icon
-            Expanded(
-              flex: 2,
-              child: Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = MediaQuery.of(context).size.width < 600;
+            
+            if (isMobile) {
+              // Mobile: 3 columns - ID, Category, Amount
+              return Row(
                 children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: color.withAlpha(20),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(
-                      isIncome ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                      color: color,
-                      size: 14,
+                  // Transaction ID
+                  Expanded(
+                    flex: 2,
+                    child: Text(shortId, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  ),
+                  // Category with icon
+                  Expanded(
+                    flex: 2,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: color.withAlpha(20),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            isIncome ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                            color: color,
+                            size: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            tx.categoryName ?? '-',
+                            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  // Amount
                   Expanded(
+                    flex: 2,
                     child: Text(
-                      tx.categoryName ?? '-',
-                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
-                      overflow: TextOverflow.ellipsis,
+                      '${isIncome ? '+' : '-'}${_formatCurrency(tx.amount)}',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: color),
                     ),
                   ),
                 ],
-              ),
-            ),
-            // Date
-            Expanded(
-              flex: 2,
-              child: Text(
-                _formatDate(tx.transactionDate),
-                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            ),
-            // Status
-            Expanded(
-              flex: 1,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withAlpha(20),
-                  borderRadius: BorderRadius.circular(12),
+              );
+            }
+            
+            // Desktop: 5 columns
+            return Row(
+              children: [
+                // Transaction ID
+                Expanded(
+                  flex: 2,
+                  child: Text(shortId, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 ),
-                child: const Text(
-                  'Selesai',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                // Category with icon
+                Expanded(
+                  flex: 2,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: color.withAlpha(20),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          isIncome ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                          color: color,
+                          size: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          tx.categoryName ?? '-',
+                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            // Amount
-            Expanded(
-              flex: 2,
-              child: Text(
-                '${isIncome ? '+' : '-'}${_formatCurrency(tx.amount)}',
-                textAlign: TextAlign.right,
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: color),
-              ),
-            ),
-          ],
+                // Date
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    _formatDate(tx.transactionDate),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                // Status
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withAlpha(20),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Selesai',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                    ),
+                  ),
+                ),
+                // Amount
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '${isIncome ? '+' : '-'}${_formatCurrency(tx.amount)}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: color),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1516,6 +1624,25 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
 // ═══════════════════════════════════════════════════════════════════════════
 // SUMMARY CARD WIDGET
 // ═══════════════════════════════════════════════════════════════════════════
+
+/// Calculate card width based on screen size (responsive)
+double _getCardWidth(BuildContext context) {
+  final screenWidth = MediaQuery.of(context).size.width;
+  const sidebarWidth = 260.0;
+  const padding = 48.0;
+  
+  if (screenWidth > 900) {
+    // Desktop: 4 cards per row
+    return (screenWidth - sidebarWidth - padding - 48) / 4;
+  } else if (screenWidth > 600) {
+    // Tablet: 2 cards per row
+    return (screenWidth - padding - 16) / 2;
+  } else {
+    // Mobile (iPhone 12 mini = 375): 1 card per row
+    return screenWidth - padding;
+  }
+}
+
 class _SummaryCard extends StatelessWidget {
   final String title;
   final double value;
@@ -1540,9 +1667,7 @@ class _SummaryCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox(
-      width: MediaQuery.of(context).size.width > 900 
-          ? (MediaQuery.of(context).size.width - 260 - 48 - 48) / 4 
-          : (MediaQuery.of(context).size.width - 48 - 16) / 2,
+      width: _getCardWidth(context),
       child: Container(
         decoration: BoxDecoration(
           gradient: isPremium 
